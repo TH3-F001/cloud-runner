@@ -1,0 +1,21 @@
+#!/bin/bash
+
+get_trusted_dns_resolver_list() {
+    local OUTPUT_FILE=$1
+    if ! check_argument "$OUTPUT_FILE"; then
+        print_error "get_trusted_dns_resolver_list expects an output file as an argument"
+        return 1
+    fi
+
+    wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt -O "$OUTPUT_FILE"
+}
+
+get_untrusted_dns_resolver_list() {
+    local OUTPUT_FILE=$1
+    if ! check_argument $OUTPUT_FILE; then
+        print_error "get_untrusted_dns_resolver_list expects an output file as an argument"
+        return 1
+    fi
+
+    wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O "$OUTPUT_FILE"
+}

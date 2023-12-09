@@ -1,0 +1,329 @@
+#!/bin/bash
+
+# --------------- File Checks --------------- # 
+path_exists() {
+    local path_arg=$1
+    if [ -e "$path_arg" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+path_doesnt_exist() {
+    local path_arg=$1
+    if [ ! -e "$path_arg" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_valid_file() {
+    local filepath=$1
+    if [ -f "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+isnt_valid_file() {
+    local filepath=$1
+    if [ ! -f "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_valid_directory() {
+    local dir_path=$1
+    if [ -d "$dir_path" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+isnt_valid_directory() {
+    local filepath=$1
+    if [ ! -d "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_empty() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_is_empty() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+
+    if [ ! -s "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_isnt_empty() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_isnt_empty() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ -s "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_readable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_is_readable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ -r "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+file_isnt_readable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_isnt_readable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ ! -r "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_writable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_is_writeable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ -w "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+file_isnt_writable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_isnt_writable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ ! -w "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_executable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_is_executable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ -x "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_isnt_executable() {
+    local filepath=$1
+
+    if [ ! -f "$filepath" ]; then
+        echo "ERROR: The filepath provided to file_isnt_executable() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+    
+    if [ ! -x "$filepath" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_newer_than() {
+    local file_a=$1
+    local file_b=$2
+
+    if [ ! -f "$file_a" ] || [ ! -f "$file_b" ]; then
+        echo "ERROR: The filepath provided to file_is_newer_than() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+
+    if [ "$file_a" -nt "$file_b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+file_is_older_than() {
+    local file_a=$1
+    local file_b=$2
+
+    if [ ! -f "$file_a" ] || [ ! -f "$file_b" ]; then
+        echo "ERROR: The filepath provided to file_is_older_than() doesnt exist or isnt a file" >&2
+        return 1
+    fi
+
+    if [ "$file_a" -ot "$file_b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+# --------------- Var Checks --------------- # 
+var_is_null_or_empty() {
+    local string=$1
+    if [ -z "$string" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+var_has_value() {
+    local string=$1
+    if [ -n "$string" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+# --------------- Integer Checks --------------- # 
+ints_are_equal() {
+    local a=$1
+    local b=$2
+
+    if [ "$a" -eq "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+ints_are_not_equal() {
+    local a=$1
+    local b=$2
+
+    if [ "$a" -ne "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+int_is_greater_than() {
+    local a=$1
+    local b=$2
+    if [ "$a" -gt "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+int_is_less_than() {
+    local a=$1
+    local b=$2
+
+    if [ "$a" -lt "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+int_is_greater_than_or_equal() {
+    local a=$1
+    local b=$2
+
+    if [ "$a" -ge "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+int_is_less_than_or_equal() {
+    local a=$1
+    local b=$2
+
+    if [ "$a" -le "$b" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+# --------------- File Checkss --------------- # 
+is_in_path() {
+    local DIR_PATH=$1
+    if ! check_argument "$DIR_PATH"; then
+        print_error "is_in_path expects a directory path as an argument"
+        return 1
+    fi
+
+    if [[ ":$PATH:" != *":$DIR_PATH:"* ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+
+# --------------- System Checks --------------- # 
+apt_package_is_installed() {
+    dpkg -l "$1" &> /dev/null
+}
+
+command_exists() {
+    local CMD=$1
+
+    if command -v "$CMD" &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}

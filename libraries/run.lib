@@ -1,0 +1,40 @@
+#!/bin/bash
+
+check_and_run_script() {
+    SCRIPT=$1
+    if ! check_argument "$SCRIPT"; then
+        print_error "check_and_run_script expects a script as an argument"
+        return 1
+    fi
+
+    if file_is_executable "$SCRIPT"; then
+        "$SCRIPT"
+        if [ $? -ne 0 ]; then
+            print_error "The $SCRIPT failed to execute properly"
+            return 1
+        fi
+    else
+        print_error "The script $SCRIPT does not exist or is not executable."
+        return 1
+    fi
+    return 0
+}
+
+run_and_indent() {
+    local COMMAND="$*"
+    if ! check_argument "$COMMAND"; then
+        print_error "run_and_indent expects a command as an argument"
+        return 1
+    fi
+
+    eval "$COMMAND" | while IFS= read -r LINE; do
+        echo -e "\t$LINE"
+    done
+
+    local EXIT_STATUS=${PIPESTATUS[0]}  # Capture the exit status of the eval command
+    if [ $EXIT_STATUS -eq 0 ]; then
+        return 0  
+    else
+        return 1 
+    fi
+}

@@ -1,0 +1,104 @@
+#!/bin/bash
+
+request_filepath() {
+    local msg=$1
+    local filepath=""
+
+    if [ -z "$msg" ]; then
+        msg="Please Provide a filepath: "
+    fi
+
+    while true; do
+        echo -e "$msg"
+        read -p "> " filepath
+        if [ ! -f "$filepath" ]; then
+            echo "ERROR: the path you provided is not a valid file."
+        else
+            echo "$filepath"
+            break
+        fi  
+    done
+}
+
+request_string() {
+    local msg=$1
+    local string=""
+
+    if [ -z "$msg" ]; then
+        msg="Please provide some input: "
+    fi
+
+    echo -e "$msg"
+    read -p "> " string
+
+    echo "$string"
+}
+
+# You can use comma_list_to_array() from convert.lib to create an array from this output
+request_usernames() {
+    local msg=$1
+    local usernames=""
+    
+    if [ -z "$msg" ]; then
+        msg="Please Provide a one or more usernames (separated by commas): "
+    fi
+
+   echo "$(request_string $msg )"
+}
+
+request_authorized_key() {
+    local key_name=$1
+    local answer=""
+    local keys=""
+    
+    if [ -z "$key_name" ]; then
+        key_name=id_rsa
+    fi
+
+    echo -e "Would you like to provide an authorized ssh key?\n\
+    [0]\tNo\n\
+    [1]\tYes - External File\n\
+    [2]\tYes - Make one\n\
+    [3]\tYes - I'll Copy/Paste"
+
+    while true; do
+        read -p "> " answer
+
+        case $answer in
+            0)
+                echo "Skipping Authorized Key..."
+                return
+                ;;
+            1)
+                local filepath=$(request_filepath "Please provide the path to your authorized key")
+                keys=$(cat "$filepath")
+                break
+                ;;
+            2)
+                ssh-keygen -t rsa -b 4096
+                if $?; then
+                    local ssh_dir="$HOME/.ssh"
+                    local latest_pub_file=$(ls -t "$ssh_dir"/*.pub 2> /dev/null | head -n 1)
+                    
+                    if [ -n "$latest_pub_file" ]; then
+                        keys=$(cat "$latest_pub_file")
+                    else
+                        echo "No .pub file found in $ssh_dir"
+                        keys=""
+                    fi
+                else
+                    echo "ERROR: Problem occurred while creating SSH key"
+                fi               
+                break
+                ;;
+            3)
+                keys=$(request_string "Please Copy/Paste your authorized key")
+                break
+                ;;
+            *)
+                echo "That is not a valid answer. please select option 0-3"
+                ;;
+        esac        
+    done
+    echo "$keys"
+}

@@ -1,0 +1,62 @@
+#!/bin/bash
+# Simple Eye-Candy functions and creature comforts like loading animations
+
+print_error() {
+  local MSG=$1
+  if check_argument $MSG; then
+    echo -e "\t ❌ [ERROR]:\t$MSG!"
+    return 0
+  fi
+
+  return 1
+}
+
+print_success() {
+    local MSG=$1
+    if check_argument $MSG; then
+        echo -e "\t ✅ [SUCCESS]:\t$MSG!"
+        return 0
+    fi
+
+    return 1
+}
+
+display_loading_animation() {
+    local PID=$1
+    local delay=0.15
+    local emojis=('🌑' '🌒' '🌓' '🌔' '🌕' '🌖' '🌗' '🌘')
+    local i=0
+
+    while [ "$(ps -p $PID -o pid=)" ]; do
+        printf "\t%s  " "${emojis[i]}"
+        sleep $delay
+        printf "\b\b\b\b\b"
+        ((i=(i+1)%8))
+    done
+    printf "    \b\b\b\b"
+}
+
+# this one needs some work. involves dynamically moving the cursor with the goal of having it travel up the terminal
+# as more lines are output (for parallelized stuff) but instead it accidentally makes a cool prompt decoration.
+display_hacky_animation() {
+    local PID=$!
+    local delay=0.15
+    local emojis=('🌑' '🌒' '🌓' '🌔' '🌕' '🌖' '🌗' '🌘')
+    local i=0
+
+    # Save cursor position
+    tput sc
+
+    while [ "$(ps a | awk '{print $1}' | grep $PID)" ]; do
+        # Restore cursor position
+        tput rc
+        # Move cursor up one line
+        tput cuu1
+        # Print emoji
+        printf "\t%s  " "${emojis[i]}"
+        sleep $delay
+        # Erase to end of line
+        tput el
+        ((i=(i+1)%8))
+    done
+}

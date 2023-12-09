@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Usage: tmux_run <command> [session_name]
+tmux_run() {
+    local COMMAND="$1"
+    local SESSION_NAME="$2"
+
+    if ! check_argument "$COMMAND"; then
+        print_error "tmux_command expects a command as an argument"
+        return 1
+    fi
+
+    if ! check_argument "$SESSION_NAME"; then
+        local cmd_name=${command%% *}
+        local cmd_hash=$(echo -n "$command" | md5)
+        SESSION_NAME="cmd_session_$(date +%s)"
+    fi
+
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        tmux kill-session -t "$SESSION_NAME"
+    fi
+
+    tmux new-session -d -s "$SESSION_NAME" "bash -c '$COMMAND; echo \$? > /tmp/cmd_exit_status'"
+
+    while true; do
+        if ! pgrep -f "$COMMAND" > /dev/null; then
+            echo "Command finished. Exiting loop..."
+            break
+        fi
+
+        tmux send-keys -t "$SESSION_NAME" Enter 2>/dev/null
+        if [ $? -eq 1 ]; then
+            sleep 1
+            break
+        fi
+        sleep 10
+    done
+
+    tmux kill-session -t "$SESSION_NAME"
+
+    if [ -s /tmp/cmd_exit_status ]; then
+        EXIT_STATUS=$(cat /tmp/cmd_exit_status)
+        rm /tmp/cmd_exit_status
+        return $EXIT_STATUS
+    else
+        return 1
+    fi
+}
+
+# Usage: tmux_run_with_timout <command> <timout> [session_name]
+tmux_run_with_timout() {
+    local COMMAND="$1"
+    local TIMEOUT="$2"
+    local SESSION_NAME="$3"
+    local START_TIME=$(date +%s)
+
+    if ! check_argument "$COMMAND"; then
+        print_error "run_command_with_timeout expects a command and a timeout as arguments"
+        return 1
+    fi
+
+    if ! check_argument "$SESSION_NAME"; then
+        local cmd_name=${command%% *}
+        local cmd_hash=$(echo -n "$command" | md5)
+        SESSION_NAME="cmd_session_$(date +%s)"
+    fi
+
+    if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        tmux kill-session -t "$SESSION_NAME"
+    fi
+
+    tmux new-session -d -s "$SESSION_NAME" "bash -c '$COMMAND; echo \$? > /tmp/cmd_exit_status'"
+
+    while true; do
+        if ! pgrep -f "$COMMAND" > /dev/null; then
+            echo "Command finished. Exiting loop..."
+            break
+        fi
+
+        local CURRENT_TIME=$(date +%s)
+        local ELAPSED_TIME=$(( CURRENT_TIME - START_TIME ))
+
+        if (( ELAPSED_TIME >= TIMEOUT )); then
+            tmux send-keys -t "$SESSION_NAME" C-c 2>/dev/null
+            sleep 2
+            break
+        fi
+
+        tmux send-keys -t "$SESSION_NAME" Enter 2>/dev/null
+        if [ $? -eq 1 ]; then
+            sleep 1
+            break
+        fi
+        sleep 10
+    done
+
+    tmux kill-session -t "$SESSION_NAME" 2>/dev/null
+
+    if [ -s /tmp/cmd_exit_status ]; then
+        EXIT_STATUS=$(cat /tmp/cmd_exit_status)
+        rm /tmp/cmd_exit_status
+        return $EXIT_STATUS
+    else
+        return 1
+    fi
+}
+
+# Usage: run_async_commands "${<array_of_commands>[@]}" 
+run_async_commands() {
+    local COMMANDS=("$@")
+    local SUCCESS=0
+    local PIDS=()
+
+    for COMMAND in "${COMMANDS[@]}"; do
+        eval "$COMMAND" &  # Use eval to interpret redirection
+        local PID=$!
+        PIDS+=("$PID")
+    done
+
+    for PID in "${PIDS[@]}"; do
+        wait "$PID"
+        if [ $? -ne 0 ]; then 
+            print_error "Command '$COMMAND' failed."
+        fi
+    done 
+
+    return $SUCCESS
+}
+
+# Makes sure that all parallel subprocesses are terminated.
+# Usage: trap cleanup sigint (at top of script after shabang)
+cleanup() {
+    echo "Caught Interrupt. Cleaning up..."
+    pkill -P $$
+    exit 1
+}

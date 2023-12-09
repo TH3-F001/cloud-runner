@@ -1,0 +1,21 @@
+#!/bin/bash
+
+make_title_case() {
+    local str=$1
+    echo $(echo "$str" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2));}1')
+}
+
+make_uppercase() {
+    local str="$1"
+    echo "${str^^}"
+}
+
+make_lowercase() {
+    local input="$1"
+    echo "${input,,}"
+}
+
+hash_value() {
+    value=$1
+    echo -n "$value" | md5sum | awk '{print $1}'
+}

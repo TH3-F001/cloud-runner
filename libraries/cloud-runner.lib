@@ -1,0 +1,20 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
+VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
+CONF_DIR="$HOME/.config/linode"
+STACKSCRIPT_DIR="$CONF_DIR/stackscripts"
+TOKEN_FILE="$CONF_DIR/token"
+ROOT_PASS_FILE="$CONF_DIR/root_pass"
+AUTHORIZED_KEYS_FILE="$CONF_DIR/authorized_keys"
+
+retrieve_root_pass() {
+    local base=$(cat "$ROOT_PASS_FILE")
+    local hash=$(echo $base | md5sum)
+    local pass=$(echo -n "$hash" | base64)
+    echo "$pass"
+}
+
+
+

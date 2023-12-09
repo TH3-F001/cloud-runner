@@ -1,0 +1,128 @@
+#!/bin/bash
+
+sort_subdomain_file() {
+    local FILE=$1
+
+    if ! check_argument "$FILE"; then
+        print_error "sort_subdomain_file expects a file path as the first argument"
+        return 1
+    fi
+
+    if [[ ! -f "$FILE" ]]; then
+        echo "File not found: $FILE"
+        return 1
+    fi
+
+    awk -F '.' '{for (i=NF; i>0; i--) printf "%s.", $i; print ""}' "$FILE" | \
+    sort | \
+    awk -F '.' '{for (i=NF; i>0; i--) printf "%s.", $i; print ""}' | \
+    rev | cut -c 2- | rev | \
+    sed '/^./s///' | \
+    sed 's/\*\.//g'
+}
+
+generate_url_list_from_domains() {
+    local DOMAINS="$1"
+
+    if ! check_argument "$DOMAINS"; then
+        print_error "generate_url_list_from_domains expects a command as an argument"
+        return 1
+    fi
+
+    local SALT=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 6)
+    local OUT_PRE=$(hash_value "$DOMAINS")
+    local URL_FILE="/tmp/url_$OUT_PRE$SALT"
+
+    OLD_IFS="$IFS"
+    IFS=','
+    read -ra DOMAIN_ARRAY <<< "$DOMAINS"
+    IFS="$OLD_IFS"
+
+    for DOMAIN in "${DOMAIN_ARRAY[@]}"; do
+        echo "http://$DOMAIN" >> "$URL_FILE"
+    done
+
+    echo "$URL_FILE"
+}
+
+join_subdomain_files() {
+    local DOMAINS=$1
+    local IN_DIR=$2
+    local OUT_DIR=$3 
+    local CMD=$4
+    local HASH
+
+    if ! check_argument "$DOMAINS" || ! check_argument "$IN_DIR"  || ! check_argument "$OUT_DIR" || ! check_argument "$CMD"; then
+        print_error "join_files_in_directory expects a domains list, an input directory, an output directory, and a command name"
+        return 1
+    fi
+
+    HASH=$(hash_value "$DOMAINS,$CMD")
+    local TMP_FILE="/tmp/parse_$HASH.tmp"
+    local OUT_FILE="${OUT_DIR}/${CMD}_parsed_${HASH}.txt"
+    : > "$OUT_FILE"  
+    local -a DOMAIN_ARRAY
+    comma_list_to_array "$DOMAINS" DOMAIN_ARRAY
+
+    for FILE in "$IN_DIR"/*; do
+        if file_exists "$FILE"; then
+            for DOMAIN in "${DOMAIN_ARRAY[@]}"; do
+                if grep -q "$DOMAIN" "$FILE"; then
+                    cat "$FILE" >> "$OUT_FILE"
+                    break 
+                fi
+            done
+        fi
+    done
+
+    sort_subdomain_file "$OUT_FILE" > "$TMP_FILE"
+    uniq "$TMP_FILE" > "$OUT_FILE"
+    echo "$OUT_FILE"
+}
+
+extract_domains_from_urls() {
+    local URL_FILE=$1
+    local OUTPUT_FILE=$2
+
+    if ! check_argument "$URL_FILE" || ! check_argument "$OUTPUT_FILE"; then
+        print_error "extract_domains_from_urls expects a URL list file, and an output file"
+        return 1
+    fi
+
+    if [[ ! -f "$URL_FILE" ]]; then
+        echo "URL file not found: $URL_FILE"
+        return 1
+    fi
+
+    grep -oP 'https?://\K[^/]+(?=/|$)' "$URL_FILE" | \
+    cut -d '@' -f2 | \
+    sed 's/:.*//' | \
+    sort -u > "$OUTPUT_FILE"
+}
+
+extract_target_domains() {
+    local IN_FILE=$1
+    local DOMAINS=$2
+    local OUT_FILE=$3
+
+    if ! check_argument "$IN_FILE" || ! check_argument "$OUT_FILE" || ! check_argument "$DOMAINS"; then
+        print_error "extract_target_domains expects a URL list file, and an output file"
+        return 1
+    fi
+
+    if [[ ! -f "$IN_FILE" ]]; then
+        echo "File not found: $IN_FILE"
+        return 1
+    fi
+
+    local -a DOMAIN_ARR
+    comma_list_to_array "$DOMAINS" DOMAIN_ARR
+    echo "" > "$OUT_FILE"  # Clear the output file or create it if it doesn't exist
+
+    for DOMAIN in "${DOMAIN_ARR[@]}"; do
+        grep "$DOMAIN" "$IN_FILE" >> "$OUT_FILE"
+    done
+    # cat $OUT_FILE
+
+    sort -u "$OUT_FILE" -o "$OUT_FILE"
+}

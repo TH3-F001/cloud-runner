@@ -1,0 +1,213 @@
+#!/bin/bash
+LIB_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+source "$LIB_SCRIPT_DIR/basic-operations.lib"
+
+# ----------- Package Maps ----------- #
+
+declare -A APT_PACKAGES=(
+    [pip3]="python3-pip"
+    [go]="golang"
+    [make]="build-essential"
+    [sqlite]="sqlite3"
+)
+
+declare -A YUM_PACKAGES=(
+    [python3]='sudo yum install python3 -y '
+    [pip3]="sudo yum install python3-pip -y "
+    [go]="sudo yum install golang -y "
+    [git]="sudo yum install git -y"
+    [make]='sudo yum groupinstall "Development Tools" -y'
+    [curl]="sudo yum install curl -y"
+    [wget]="sudo yum install wget -y"
+    [sqlite]="sudo yum install sqlite3 -y"
+    [jq]="sudo yum install jq -y"
+)
+
+declare -A DNF_PACKAGES=(
+    [python3]='sudo dnf install python3 -y '
+    [pip3]="sudo dnf install python3-pip -y "
+    [go]="sudo dnf install golang -y "
+    [git]="sudo dnf install git -y"
+    [make]='sudo dnf groupinstall "Development Tools" -y'
+    [curl]="sudo dnf install curl -y"
+    [wget]="sudo dnf install wget -y"
+    [sqlite]="sudo dnf install sqlite3"
+    [jq]="sudo dnf install jq -y"
+)
+
+declare -A PACMAN_PACKAGES=(
+    [pip3]="python-pip"
+    [pipx]="python-pipx"
+)
+
+declare -A ZYPPER_PACKAGES=(
+    [pip3]="python3-pip"
+)
+
+declare -A EMERGE_PACKAGES=(
+    [python3]="dev-lang/python3.11"
+    [pip3]="dev=python/pip"
+    [go]="dev-lang/go"
+    [git]="dev-vcs/git"
+    [make]="build"
+    [wget]="net-misc/wget"
+    [expect]="dev-tcltk/expect"
+    [sqlite]="dev-db/sqlite"
+    [jq]="app-misc/jq"
+)
+
+
+# ----------- Boilerplate Functions ----------- #
+
+generic_install_package() {
+  local PACKAGE_NAME=$1
+  local INSTALL_COMMAND=$2
+
+  if ! check_argument "$PACKAGE_NAME" || ! check_argument "$INSTALL_COMMAND"; then
+    print_error "Missing Required Arguments In 'generic_install_package'"
+    return 1
+  fi
+  
+  echo "📦 Installing $1..."
+
+  if eval "$INSTALL_COMMAND"; then 
+    print_success "Successfully Installed $PACKAGE_NAME"
+  else
+    print_error "A problem occured while installing $PACKAGE_NAME"
+    return 1
+  fi
+}
+
+set_shell_script_permissions() {
+  local DIRECTORY=$1
+
+  echo -e "\t 🖥️ Setting permissions for shell scripts in $DIRECTORY"
+
+  if ! check_argument "$DIRECTORY"; then
+      print_error "set_shell_script_permissions expects a directory as an argument"
+      return 1
+  fi
+
+  if ! directory_exists "$DIRECTORY"; then
+      print_error "The directory $DIRECTORY does not exist."
+      return 1
+  fi
+
+  find "$DIRECTORY" -type f -name "*.sh" -exec chmod 755 {} \;
+  print_success "Project shell scripts are now exectuable"
+  return 0
+}
+
+add_directories_to_path() {
+  local ADDITIONAL_PATHS=("$@") 
+  local PROFILE_FILE="/etc/profile.d/added-paths.sh"
+  local PATH_ADDITION=""
+
+  for DIR in "${ADDITIONAL_PATHS[@]}"; do
+      if ! is_in_path "$DIR" ; then
+          echo "Adding $DIR to PATH"
+          PATH_ADDITION="$DIR:$PATH_ADDITION"
+      fi
+  done
+
+  if [ -n "$PATH_ADDITION" ]; then
+      export PATH="$PATH_ADDITION$PATH"
+      EXPORT_LINE="export PATH=\"$PATH_ADDITION\$PATH\""
+      export PATH="$PATH_ADDITION$PATH"
+      if ! grep -qF "$PATH_ADDITION" "$PROFILE_FILE"; then
+          echo -e "#!/bin/bash\n $EXPORT_LINE" | sudo tee "$PROFILE_FILE"
+      fi
+  fi
+}
+
+prompt_for_api_key() {
+  local API_NAME=$1
+  if ! check_argument $API_NAME; then
+    print_error "prompt_for_api_key expects an API name as an argument"
+    return 1
+  fi 
+
+  local API_KEY
+
+  while true; do
+    read -rsp "Please enter your $API_NAME API Key: " API_KEY
+    if [[ -z "$API_KEY" ]]; then
+      print_error "API key can't be empty. please enter a valid $API_NAME API key"
+    else
+      break
+    fi
+  done
+  echo "$API_KEY"
+}
+
+# ----------- Package Manager Install Functions ----------- #
+install_with_apt() {
+  local PACKAGES=("$@")
+  sudo apt update
+  for PKG in "${PACKAGES[@]}"; do
+    APT_PKG=${APT_PACKAGES[$PKG]:-$PKG}
+    generic_install_package "$PKG" "sudo apt install -y $APT_PKG"
+  done
+}
+
+install_with_yum() {
+  local PACKAGES=("$@")
+  sudo yum check-update
+
+  for PKG in "${PACKAGES[@]}"; do
+    YUM_CMD=${YUM_PACKAGES[$PKG]:-"sudo yum install $PKG -y"}
+    generic_install_package "$PKG" "$YUM_CMD"
+  done
+}
+
+install_with_dnf() {
+  local PACKAGES=("$@")
+  sudo dnf check-update
+
+  for PKG in "${PACKAGES[@]}"; do
+    DNF_CMD=${DNF_PACKAGES[$PKG]:-"sudo dnf install $PKG -y"}
+    generic_install_package "$PKG" "$DNF_CMD"
+  done
+}
+
+install_with_pacman() {
+  local PACKAGES=("$@")
+  for PKG in "${PACKAGES[@]}"; do
+    PACMAN_PKG=${PACMAN_PACKAGES[$PKG]:-$PKG}
+    generic_install_package "$PKG" "sudo pacman -S --noconfirm $PACMAN_PKG"
+  done
+}
+
+install_with_zypper() {
+  local PACKAGES=("$@")
+  sudo zypper refresh
+
+  for PKG in "${PACKAGES[@]}"; do
+    ZYPPER_PKG=${ZYPPER_PACKAGES[$PKG]:-$PKG}
+    generic_install_package "$PKG" "sudo zypper install -y $ZYPPER_PKG"
+  done
+}
+
+install_with_emerge() {
+  local PACKAGES=("$@")
+  sudo emerge --sync
+  for PKG in "${PACKAGES[@]}"; do
+    EMERGE_PKG=${EMERGE_PACKAGES[$PKG]:-$PKG}
+    generic_install_package "$PKG" "sudo emerge $EMERGE_PKG"
+  done
+}
+
+install_with_snap() {
+    local PACKAGE_NAME=$1
+    local SNAP_COMMAND="sudo snap install $PACKAGE_NAME"
+    generic_install_package "$PACKAGE_NAME" "$SNAP_COMMAND"
+}
+
+install_with_flatpak() {
+    local PACKAGE_NAME=$1
+    local FLATPAK_COMMAND="flatpak install -y $PACKAGE_NAME"
+    generic_install_package "$PACKAGE_NAME" "$FLATPAK_COMMAND"
+}
+
+

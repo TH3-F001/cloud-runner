@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Usage: array_to_comma_list my_array (note there is $ used because the array is passed by reference)
+array_to_comma_list() {
+    local -n ARRAY=$1
+    if ! check_argument $ARRAY;then
+        print_error "array_to_comma_list expects an array as an argument"
+        return 1
+    fi
+    local IFS=','
+    echo "${ARRAY[*]}"
+}
+
+# Usage: comma_list_to_array $comma_list  my_array
+comma_list_to_array() {
+    local LIST=$1
+    local -n ARR=$2  
+
+    if ! check_argument "$LIST"; then
+        print_error "comma_list_to_array expects a comma-separated string as an argument"
+        return 1
+    fi
+
+    local IFS=',' 
+    read -ra ARR <<< "$LIST"
+}
+
+file_to_comma_list() {
+    local FILEPATH=$1
+    local LIST_STRING=""
+
+    if ! file_exists $FILEPATH; then
+        print_error "File Not Found: $FILEPATH"
+        return 1
+    fi
+
+    while IFS= read -r line; do
+        if [ -z "$LIST_STRING" ]; then
+            LIST_STRING="$line"
+        else
+            LIST_STRING="$LIST_STRING,$line"
+        fi
+    done < "$FILEPATH"
+
+    echo "$LIST_STRING"
+}
+
+# Usage: file_to_array "$my_file" my_array
+file_to_array() {
+    local FILE=$1
+    local -n ARR=$2  # Create a nameref to the original array
+
+    if ! file_exists "$FILE"; then
+        print_error "File not found: $FILE"
+        return 1
+    fi
+
+    mapfile -t ARR < "$FILE"
+}

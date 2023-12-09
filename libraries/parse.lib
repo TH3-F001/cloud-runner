@@ -1,0 +1,41 @@
+#!/bin/bash
+
+sort_domain_file() {
+    local FILE=$1
+
+    if [[ ! -f "$FILE" ]]; then
+        echo "File not found: $FILE"
+        return 1
+    fi
+
+    awk -F '.' '{for (i=NF; i>0; i--) printf "%s.", $i; print ""}' "$FILE" | \
+    sort | \
+    awk -F '.' '{for (i=NF; i>0; i--) printf "%s.", $i; print ""}' | \
+    rev | cut -c 2- | rev | \
+    sed '/^./s///' | \
+    sed 's/\*\.//g'
+}
+
+generate_url_list_from_domains() {
+    local DOMAINS="$1"
+
+    if ! check_argument "$DOMAINS"; then
+        print_error "generate_url_list_from_domains expects a command as an argument"
+        return 1
+    fi
+
+    local SALT=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 6)
+    local OUT_PRE=$(hash_value "$DOMAINS")
+    local URL_FILE="/tmp/url_$OUT_PRE$SALT"
+
+    OLD_IFS="$IFS"
+    IFS=','
+    read -ra DOMAIN_ARRAY <<< "$DOMAINS"
+    IFS="$OLD_IFS"
+
+    for DOMAIN in "${DOMAIN_ARRAY[@]}"; do
+        echo "http://$DOMAIN" >> "$URL_FILE"
+    done
+
+    echo "$URL_FILE"
+}
