@@ -6,11 +6,7 @@ LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
 VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
 CONF_DIR="$HOME/.config/linode"
 STACKSCRIPT_DIR="$CONF_DIR/stackscripts"
-TOKEN_FILE="$CONF_DIR/token"
-ROOT_PASS_FILE="$CONF_DIR/root_pass"
-AUTHORIZED_KEYS_FILE="$CONF_DIR/authorized_keys"
-
-
+CONF_FILE="$CONF_DIR/cloud-runner.conf"
 
 # Install and source n00b-bash libraries
 echo -e "\n📦 Installing n00b-bash libs..."
@@ -39,9 +35,6 @@ fi
 # Ask for Linode token
 if ! file_exists "$TOKEN_FILE"; then
     read -p "Please provide you're Linode Access Token: " TOKEN
-    mkdir -p "$CONF_DIR"
-    echo "TOKEN=$TOKEN" > "$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"S
 fi
 
 
@@ -53,7 +46,9 @@ linode-cli configure --token
 # Gather user input needed for deploy-cloud-runner.sh
 echo "Akamai requires a root password to creat a new Linode. In order to adhere to their password requirements, your password will be encoded"
 BASE_PASS=$(request_string "Please provide your desired root password for your Linode cloud runner")
-SSH_PUB_KEY=$(request_authorized_key "cloud-runner_rsa")
+
+AUTHORIZED_KEY=$(request_authorized_key "cloud-runner_rsa")
+
 
 # Check if the user wants to add any additional stackscripts to run on deployment.
 if request_confirmation "Would you like to include any additional scripts to run on your linode's first boot?"; then
@@ -71,21 +66,23 @@ if request_confirmation "Would you like to include any additional scripts to run
     done
 fi
 
-# Modify the password to fit requirements
-PASS_HASH=$(echo $BASE_PASS | md5sum)
-ENCODED
-# Write the configuration info
+# Write the configuration info disk
+mkdir -p "$CONF_DIR"
+rm -rf "$CONF_FILE"
+echo -e "LINODE_TOKEN=\"$TOKEN\"" >> "$CONF_FILE" 
+echo -e "LINODE_ROOT_PASS=\"$BASE_PASS\"" >> "$CONF_FILE"
+if var_has_value "$AUTHORIZED_KEY"; then
+    echo -e "LINODE_AUTHORIZED_KEY=\"$AUTHORIZED_KEY\"" >> "$CONF_FILE"
+fi
+chmod 600 "$CONF_FILE"
 
 
 
 # Check if install was successfull
-if command_exists linode-cli && file_exists "$TOKEN_FILE"; then
+if command_exists linode-cli && file_exists "$CONF_FILE"; then
     print_success "Linode-CLI successfully installed"
     
 else
     print_error "An problem occurred while installing Linode-CLI"
     exit 1
 fi
-
-
-linode 
