@@ -45,6 +45,10 @@ touch "$LOG"
 # Declare Argument Variables
 CLOUD_PRIV_KEY="$PRIV_KEY"
 CLOUD_PUB_KEY="$PUB_KEY"
+HOME_SSH_PORT="$SSH_PORT"
+HOME_SSH_IP="$SSH_IP"
+
+
 # Install Initial Dependencies 
 echo "Installing Initial Dependencies..." &>>"$LOG"
 
@@ -81,7 +85,7 @@ echo "Creating New User..." &>>"$LOG"
 NEW_USER="cloud-runner"
 USER_HOME="/home/$NEW_USER" 
 useradd -m -U -s /bin/bash "$NEW_USER" &>>"$LOG"
-
+mkdir -p "$USER_HOME/cloud-runner"
 
 # Generate a random password for the user
 echo "Generating Random Password..." &>>"$LOG"
@@ -107,7 +111,7 @@ chmod 600 "$USER_HOME"/.ssh/authorized_keys &>>"$LOG"
 chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub
 chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa
 
-# Edit sshd_config
+# Edit sshd_config for some tighter security
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 sed -i 's/^#Port 22/Port 42122/' /etc/ssh/sshd_config
 sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -116,6 +120,10 @@ sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_
 sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
+
+# Save HOME_SSH_PORT and HOME_IP to disk
+echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
+echo "$HOME_IP" > "$USER_HOME/cloud-runner/home_ip"
 
 # Allow for passwordless sudo
 echo "Adding new user to the sudoers file..." &>>"$LOG"

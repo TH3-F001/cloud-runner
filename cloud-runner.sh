@@ -7,7 +7,7 @@ CONF_FILE="$CONF_DIR/cloud-reunner.conf"
 CLOUDRUNNER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 SSH_USER="cloud-runner"
 SSH_KEY_PATH="$CONF_DIR/access/cloud-runner_rsa"
-SSH_PORT=42122
+CLOUD_SSH_PORT=42122
 LINODE_LABEL="Cloud-Runner"
 STACKSCRIPT_LABEL="$LINODE_LABEL-Script"
 USER_SCRIPT=$1
@@ -24,7 +24,14 @@ source "$CONF_FILE"
 
 lin stackscripts delete $(get_stackscript_id $STACKSCRIPT_LABEL)
 create_linode_stackscript "$CLOUDRUNNER_STACKSCRIPT" "$STACKSCRIPT_LABEL" "$CLOUDRUNNER_DEFAULT_IMAGE"
-lin linodes create --root_pass "$(encode_password $CLOUDRUNNER_ROOT_PASS)" --authorized_keys "$(cat $HOME_TO_CLOUD_KEY)" --label "$LINODE_LABEL" --swap_size 8192 --stackscript_id "$(get_stackscript_id $STACKSCRIPT_LABEL)"
+lin linodes create \
+    --root_pass "$(encode_password $CLOUDRUNNER_ROOT_PASS)" \
+    --authorized_keys "$(cat $HOME_TO_CLOUD_KEY)" \
+    --label "$LINODE_LABEL" \
+    --swap_size 8192 \
+    --stackscript_id "$(get_stackscript_id $STACKSCRIPT_LABEL)" \
+    --stackscript_data "{\"PRIV_KEY\":\"$CLOUD_TO_HOME_KEY\", \"PUB_KEY\":\"$CLOUD_TO_HOME_KEY.pub\", \"SSH_PORT\":\"$SSH_PORT\", \"SSH_IP\":\"$PUB_IP\"}"
+
 sleep 1
 LINODE_IP=$(get_linode_ipv4 "$LINODE_LABEL")
 

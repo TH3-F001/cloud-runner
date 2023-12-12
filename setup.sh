@@ -42,6 +42,8 @@ echo "Akamai requires a root password for your new Linode. In order to adhere to
 BASE_PASS=$(request_string "Please provide your desired root password for your Linode cloud runner")
 HOME_TO_CLOUD_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-cloud_rsa")
 CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa")
+SSH_PORT=$(request_port_number "Which Public facing SSH port should cloud-runner send output to?")
+PUB_IP=$(curl ipinfo.io/ip)
 
 # Gather User supplied dependencies.
 echo "Cloud-Runner allows you to specify dependencies to install on boot as long as they exist in your default image's package manager"
@@ -59,6 +61,9 @@ touch "$CONF_FILE"
 echo -e "CLOUDRUNNER_ROOT_PASS=\"$(echo $BASE_PASS | sha1sum)\"" > "$CONF_FILE"
 echo -e "HOME_TO_CLOUD_KEY=\"$HOME_TO_CLOUD_AUTH_KEY\"" >> "$CONF_FILE"
 echo -e "CLOUD_TO_HOME_KEY=\"$CLOUD_TO_HOME_AUTH_KEY\"" >> "$CONF_FILE"
+echo -e "SSH_PORT=\"$SSH_PORT\"" >>$CONF_FILE
+echo -e "PUB_IP=\"$PUB_IP\"" >>$CONF_FILE
+
 
 chmod 600 "$CONF_FILE"
 
@@ -89,6 +94,29 @@ IFS=' ' read -r -a USER_DEPS_ARRAY <<< "$USER_DEPS"
 DEPS_STRING=$(printf " \"%s\"" "${USER_DEPS_ARRAY[@]}")
 DEPS_STRING=${DEPS_STRING:1}
 sed -i "s/# Placeholder for user dependencies/DEPENDENCIES+=($DEPS_STRING)/" "$MASTER_STACKSCRIPT"
+
+
+# Install sshd if needed 
+if ! type sshd; then
+    if ! install_packages sshd; then
+        echo "Failed to Install sshd. Please install, enable, and allow pubkey authentication"
+    fi
+fi
+
+# Allow Pubkey Authentication
+sudo sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
+sudo sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
+
+# Enable sshd if it isnt already enabled, restart it if it is
+if ! systemctl is-enabled sshd &> /dev/null; then
+    sudo systemctl enable sshd
+    sudo systemctl start sshd
+    if ! sudo systemctl status sshd; then
+        echo "An error occurred while enabling sshd. please investigate and enable"
+    fi
+else
+    sudo systemctl restart sshd
+fi
 
 
 # Check if install was successfull
