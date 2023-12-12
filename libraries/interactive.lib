@@ -9,10 +9,10 @@ request_filepath() {
     fi
 
     while true; do
-        echo -e "$msg"
-        read -p "> " filepath
+        echo -e "$msg" >&2
+        read -p "> " filepath >&2
         if [ ! -f "$filepath" ]; then
-            echo "ERROR: the path you provided is not a valid file."
+            echo "ERROR: the path you provided is not a valid file." >&2
         else
             echo "$filepath"
             break
@@ -28,8 +28,8 @@ request_string() {
         msg="Please provide some input: "
     fi
 
-    echo -e "$msg"
-    read -p "> " string
+    echo -e "$msg" >&2
+    read -p "> " string >&2
 
     echo "$string"
 }
@@ -38,12 +38,15 @@ request_string() {
 request_usernames() {
     local msg=$1
     local usernames=""
+    local suffix="(separated by commas): "
     
     if [ -z "$msg" ]; then
-        msg="Please Provide a one or more usernames (separated by commas): "
+        msg="Please Provide a one or more usernames"
     fi
 
-   echo "$(request_string $msg )"
+    full_msg="$msg $suffix"
+
+   echo "$(request_string $full_msg )"
 }
 
 request_authorized_key() {
@@ -59,14 +62,14 @@ request_authorized_key() {
     [0]\tNo\n\
     [1]\tYes - External File\n\
     [2]\tYes - Make one\n\
-    [3]\tYes - I'll Copy/Paste"
+    [3]\tYes - I'll Copy/Paste" >&2
 
     while true; do
-        read -p "> " answer
+        read -p "> " answer >&2
 
         case $answer in
             0)
-                echo "Skipping Authorized Key..."
+                echo "Skipping Authorized Key..." >&2
                 return
                 ;;
             1)
@@ -75,19 +78,22 @@ request_authorized_key() {
                 break
                 ;;
             2)
-                ssh-keygen -t rsa -b 4096
-                if $?; then
+                local key_file="$HOME/.ssh/$key_name"
+                rm -rf "$key_file"
+                ssh-keygen -t rsa -b 4096 -N "" -f "$key_file" >&2
+                if [ $? -eq 0 ]; then
                     local ssh_dir="$HOME/.ssh"
-                    local latest_pub_file=$(ls -t "$ssh_dir"/*.pub 2> /dev/null | head -n 1)
+                    local latest_pub_file=$(ls -t "$ssh_dir"/*.pub 2> /dev/null | head -n 1) >&2
                     
                     if [ -n "$latest_pub_file" ]; then
                         keys=$(cat "$latest_pub_file")
                     else
-                        echo "No .pub file found in $ssh_dir"
+                        echo "No .pub file found in $ssh_dir" >&2
                         keys=""
                     fi
                 else
-                    echo "ERROR: Problem occurred while creating SSH key"
+                    echo "ERROR: Problem occurred while creating SSH key" >&2
+                    keys=""
                 fi               
                 break
                 ;;
@@ -101,4 +107,32 @@ request_authorized_key() {
         esac        
     done
     echo "$keys"
+}
+
+request_confirmation() {
+    local msg=$1
+    local suffix="(y/n)"
+    
+    if [ -z "$msg" ]; then
+        msg="Please Choose one"
+    fi
+
+    full_msg="$msg $suffix"
+
+    local response=""
+    while true; do
+        response=$(request_string "$full_msg" )
+        
+        case $response in
+            "y")
+                return 0
+                ;;
+            "n")
+                return 1
+                ;;
+            *)
+                echo "Please enter y or n"
+                ;;
+        esac
+    done
 }

@@ -2,23 +2,13 @@
 # Simple Eye-Candy functions and creature comforts like loading animations
 
 print_error() {
-  local MSG=$1
-  if check_argument $MSG; then
+    local MSG=$1
     echo -e "\t ❌ [ERROR]:\t$MSG!"
-    return 0
-  fi
-
-  return 1
 }
 
 print_success() {
     local MSG=$1
-    if check_argument $MSG; then
-        echo -e "\t ✅ [SUCCESS]:\t$MSG!"
-        return 0
-    fi
-
-    return 1
+    echo -e "\t ✅ [SUCCESS]:\t$MSG!"
 }
 
 display_loading_animation() {

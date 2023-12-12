@@ -1,20 +1,94 @@
 #!/bin/bash
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
-VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
-CONF_DIR="$HOME/.config/linode"
-STACKSCRIPT_DIR="$CONF_DIR/stackscripts"
-TOKEN_FILE="$CONF_DIR/token"
-ROOT_PASS_FILE="$CONF_DIR/root_pass"
-AUTHORIZED_KEYS_FILE="$CONF_DIR/authorized_keys"
+CONF_DIR="$HOME/.config/cloud-runner"
+CONF_FILE="$CONF_DIR/cloud-runner.conf"
+CLOUDRUNNER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 
-retrieve_root_pass() {
-    local base=$(cat "$ROOT_PASS_FILE")
+encode_password() {
+    local base=$1
     local hash=$(echo $base | md5sum)
     local pass=$(echo -n "$hash" | base64)
     echo "$pass"
 }
 
+get_linode_id() {
+    local label=$1
 
+    if [ -z "$label" ]; then
+        label="Cloud Runner"
+    fi
+
+    local id=$(linode-cli linodes list --label "$label" --json | jq '.[].id')
+    echo "$id"
+}
+
+get_linode_image() {
+    local label="$1"
+
+    if [ -z "$label" ]; then
+        label="Cloud Runner"
+    fi
+
+    local image=$(linode-cli linodes list --label "$label" --json | jq -r '.[].image')
+    echo "$image"
+}
+
+get_linode_ipv4() {
+    local label=$1
+
+    local ip=$(linode-cli linodes list --label "$label" --json | jq -r '.[].ipv4[0]')
+    echo "$ip"
+}
+
+get_linode_ipv6() {
+    local label=$1
+
+    local ip=$(linode-cli linodes list --label "$label" --json | jq -r '.[].ipv6[0]')
+    echo "$ip"
+}
+
+get_stackscript_id() {
+    local label=$1
+
+    local id=$(linode-cli stackscripts list --label "$label" --json | jq '.[].id')
+    echo "$id"
+}
+
+append_to_cloudrunner_stackscript() {
+    local script_path="$1"
+    local destination="$2"
+    local msg="$3"
+
+    echo -e "\n\n# $msg from $script_path" >> "$destination"
+    cat "$script_path" >> "$destination"
+}
+
+create_linode_stackscript() {
+    local filepath="$1"
+    local label="$2"
+    local image_id="$3"
+
+    if [ -z "$filepath" ] || [ -z "$label" ] || [ -z "$image_id" ]; then
+        echo "Missing required arguments: filepath, label, or image_id."
+        echo -e "Filepath: $filepath\nLabel: $label\nImage_ID: $image_id" 
+        return 1
+    fi
+
+    if [ ! -f "$filepath" ]; then
+        echo "The provided filepath does not exist: $filepath"
+        return 1
+    fi
+
+    local script_content
+    script_content=$(< "$filepath")
+    echo "label=$label"
+    echo "script_content=$script_content"
+    echo "image_id=$image_id"
+
+    linode-cli stackscripts create \
+        --label "$label" \
+        --script "$script_content" \
+        --images "$image_id" \
+        --is_public false
+}
 

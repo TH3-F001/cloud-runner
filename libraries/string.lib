@@ -19,3 +19,17 @@ hash_value() {
     value=$1
     echo -n "$value" | md5sum | awk '{print $1}'
 }
+
+remove_extension() {
+    local filename="$1"
+    local name_without_extension="${filename%.*}"
+    echo "$name_without_extension"
+}
+
+replace() {
+    local original_string="$1"
+    local search_string="$2"
+    local replace_string="$3"
+    local modified_string="${original_string//"$search_string"/"$replace_string"}"
+    echo "$modified_string"
+}

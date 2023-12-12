@@ -1,18 +1,16 @@
 #!/bin/bash
-LIB_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
-source "$LIB_SCRIPT_DIR/basic-operations.lib"
+lib_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # ----------- Package Maps ----------- #
 
-declare -A APT_PACKAGES=(
+declare -A apt_packages=(
     [pip3]="python3-pip"
     [go]="golang"
     [make]="build-essential"
     [sqlite]="sqlite3"
 )
 
-declare -A YUM_PACKAGES=(
+declare -A yum_packages=(
     [python3]='sudo yum install python3 -y '
     [pip3]="sudo yum install python3-pip -y "
     [go]="sudo yum install golang -y "
@@ -24,7 +22,7 @@ declare -A YUM_PACKAGES=(
     [jq]="sudo yum install jq -y"
 )
 
-declare -A DNF_PACKAGES=(
+declare -A dnf_packages=(
     [python3]='sudo dnf install python3 -y '
     [pip3]="sudo dnf install python3-pip -y "
     [go]="sudo dnf install golang -y "
@@ -36,16 +34,16 @@ declare -A DNF_PACKAGES=(
     [jq]="sudo dnf install jq -y"
 )
 
-declare -A PACMAN_PACKAGES=(
+declare -A pacman_packages=(
     [pip3]="python-pip"
     [pipx]="python-pipx"
 )
 
-declare -A ZYPPER_PACKAGES=(
+declare -A zypper_packages=(
     [pip3]="python3-pip"
 )
 
-declare -A EMERGE_PACKAGES=(
+declare -A emerge_packages=(
     [python3]="dev-lang/python3.11"
     [pip3]="dev=python/pip"
     [go]="dev-lang/go"
@@ -61,41 +59,41 @@ declare -A EMERGE_PACKAGES=(
 # ----------- Boilerplate Functions ----------- #
 
 generic_install_package() {
-  local PACKAGE_NAME=$1
-  local INSTALL_COMMAND=$2
+  local package_name=$1
+  local install_cmd=$2
 
-  if ! check_argument "$PACKAGE_NAME" || ! check_argument "$INSTALL_COMMAND"; then
-    print_error "Missing Required Arguments In 'generic_install_package'"
+  if [ -z "$package_name" ] || [ -z "$install_cmd" ]; then
+    echo "Missing Required Arguments In 'generic_install_package'"
     return 1
   fi
   
   echo "📦 Installing $1..."
 
-  if eval "$INSTALL_COMMAND"; then 
-    print_success "Successfully Installed $PACKAGE_NAME"
+  if eval "$install_cmd"; then 
+    echo "Successfully Installed $package_name"
   else
-    print_error "A problem occured while installing $PACKAGE_NAME"
+    echo "A problem occured while installing $package_name"
     return 1
   fi
 }
 
 set_shell_script_permissions() {
-  local DIRECTORY=$1
+  local directory=$1
 
-  echo -e "\t 🖥️ Setting permissions for shell scripts in $DIRECTORY"
+  echo -e "\t 🖥️ Setting permissions for shell scripts in $directory"
 
-  if ! check_argument "$DIRECTORY"; then
-      print_error "set_shell_script_permissions expects a directory as an argument"
+  if [ -z "$directory" ]; then
+      echo "set_shell_script_permissions expects a directory as an argument"
       return 1
   fi
 
-  if ! directory_exists "$DIRECTORY"; then
-      print_error "The directory $DIRECTORY does not exist."
+  if [ ! -d "$directory" ]; then
+      echo "The directory $directory does not exist."
       return 1
   fi
 
-  find "$DIRECTORY" -type f -name "*.sh" -exec chmod 755 {} \;
-  print_success "Project shell scripts are now exectuable"
+  find "$directory" -type f -name "*.sh" -exec chmod 755 {} \;
+  echo "Project shell scripts are now exectuable"
   return 0
 }
 
@@ -105,7 +103,9 @@ add_directories_to_path() {
   local PATH_ADDITION=""
 
   for DIR in "${ADDITIONAL_PATHS[@]}"; do
-      if ! is_in_path "$DIR" ; then
+      if echo ":$PATH:" | grep -q ":$DIR:" ; then
+          echo "$DIR is already in PATH"
+      else
           echo "Adding $DIR to PATH"
           PATH_ADDITION="$DIR:$PATH_ADDITION"
       fi
@@ -113,101 +113,126 @@ add_directories_to_path() {
 
   if [ -n "$PATH_ADDITION" ]; then
       export PATH="$PATH_ADDITION$PATH"
-      EXPORT_LINE="export PATH=\"$PATH_ADDITION\$PATH\""
-      export PATH="$PATH_ADDITION$PATH"
-      if ! grep -qF "$PATH_ADDITION" "$PROFILE_FILE"; then
-          echo -e "#!/bin/bash\n $EXPORT_LINE" | sudo tee "$PROFILE_FILE"
-      fi
+      local EXPORT_LINE="export PATH=\"$PATH_ADDITION\$PATH\""
+      echo -e "#!/bin/bash\n$EXPORT_LINE" | sudo tee "$PROFILE_FILE"
   fi
 }
 
+
 prompt_for_api_key() {
-  local API_NAME=$1
-  if ! check_argument $API_NAME; then
-    print_error "prompt_for_api_key expects an API name as an argument"
+  local api_name=$1
+  if [ -z $api_name ] ;then
+    echo "prompt_for_api_key expects an API name as an argument"
     return 1
   fi 
 
-  local API_KEY
+  local api_key
 
   while true; do
-    read -rsp "Please enter your $API_NAME API Key: " API_KEY
-    if [[ -z "$API_KEY" ]]; then
-      print_error "API key can't be empty. please enter a valid $API_NAME API key"
+    read -rsp "Please enter your $api_name API Key: " api_key
+    if [ -z "$api_key" ]; then
+      echo "API key can't be empty. please enter a valid $api_name API key"
     else
       break
     fi
   done
-  echo "$API_KEY"
+  echo "$api_key"
 }
 
 # ----------- Package Manager Install Functions ----------- #
 install_with_apt() {
-  local PACKAGES=("$@")
+  local packages=("$@")
   sudo apt update
-  for PKG in "${PACKAGES[@]}"; do
-    APT_PKG=${APT_PACKAGES[$PKG]:-$PKG}
-    generic_install_package "$PKG" "sudo apt install -y $APT_PKG"
+  for pkg in "${packages[@]}"; do
+    local apt_pkg=${apt_packages[$pkg]:-$pkg}
+    generic_install_package "$pkg" "sudo apt install -y $apt_pkg"
   done
 }
 
 install_with_yum() {
-  local PACKAGES=("$@")
+  local packages=("$@")
   sudo yum check-update
 
-  for PKG in "${PACKAGES[@]}"; do
-    YUM_CMD=${YUM_PACKAGES[$PKG]:-"sudo yum install $PKG -y"}
-    generic_install_package "$PKG" "$YUM_CMD"
+  for pkg in "${packages[@]}"; do
+  local yum_cmd=${yum_packages[$pkg]:-"sudo yum install $pkg -y"}
+    generic_install_package "$pkg" "$yum_cmd"
   done
 }
 
 install_with_dnf() {
-  local PACKAGES=("$@")
+  local packages=("$@")
   sudo dnf check-update
 
-  for PKG in "${PACKAGES[@]}"; do
-    DNF_CMD=${DNF_PACKAGES[$PKG]:-"sudo dnf install $PKG -y"}
-    generic_install_package "$PKG" "$DNF_CMD"
+  for pkg in "${packages[@]}"; do
+    local dnf_cmd=${dnf_packages[$pkg]:-"sudo dnf install $pkg -y"}
+    generic_install_package "$pkg" "$dnf_cmd"
   done
 }
 
 install_with_pacman() {
-  local PACKAGES=("$@")
-  for PKG in "${PACKAGES[@]}"; do
-    PACMAN_PKG=${PACMAN_PACKAGES[$PKG]:-$PKG}
-    generic_install_package "$PKG" "sudo pacman -S --noconfirm $PACMAN_PKG"
+  local packages=("$@")
+  for pkg in "${packages[@]}"; do
+    local pacman_pkg=${pacman_packages[$pkg]:-$pkg}
+    generic_install_package "$pkg" "sudo pacman -S --noconfirm $pacman_pkg"
   done
 }
 
 install_with_zypper() {
-  local PACKAGES=("$@")
+  local packages=("$@")
   sudo zypper refresh
 
-  for PKG in "${PACKAGES[@]}"; do
-    ZYPPER_PKG=${ZYPPER_PACKAGES[$PKG]:-$PKG}
-    generic_install_package "$PKG" "sudo zypper install -y $ZYPPER_PKG"
+  for pkg in "${packages[@]}"; do
+    local zypper_pkg=${zypper_packages[$pkg]:-$pkg}
+    generic_install_package "$pkg" "sudo zypper install -y $zypper_pkg"
   done
 }
 
 install_with_emerge() {
-  local PACKAGES=("$@")
+  local packages=("$@")
   sudo emerge --sync
-  for PKG in "${PACKAGES[@]}"; do
-    EMERGE_PKG=${EMERGE_PACKAGES[$PKG]:-$PKG}
-    generic_install_package "$PKG" "sudo emerge $EMERGE_PKG"
+  for pkg in "${packages[@]}"; do
+    local emerge_pkg=${emerge_packages[$pkg]:-$pkg}
+    generic_install_package "$pkg" "sudo emerge $emerge_pkg"
   done
 }
 
 install_with_snap() {
-    local PACKAGE_NAME=$1
-    local SNAP_COMMAND="sudo snap install $PACKAGE_NAME"
-    generic_install_package "$PACKAGE_NAME" "$SNAP_COMMAND"
+    local package_name=$1
+    local snap_cmd="sudo snap install $package_name"
+    generic_install_package "$package_name" "$snap_cmd"
 }
 
 install_with_flatpak() {
-    local PACKAGE_NAME=$1
-    local FLATPAK_COMMAND="flatpak install -y $PACKAGE_NAME"
-    generic_install_package "$PACKAGE_NAME" "$FLATPAK_COMMAND"
+    local package_name=$1
+    local flatpack_cmd="flatpak install -y $package_name"
+    generic_install_package "$package_name" "$flatpack_cmd"
 }
 
-
+install_packages() {
+    local packages=("$@")
+    
+    # Check for APT (Debian/Ubuntu)
+    if command -v apt > /dev/null; then
+        echo "Using APT package manager."
+        install_with_apt "${packages[@]}"
+    # Check for DNF (Fedora)
+    elif command -v dnf > /dev/null; then
+        echo "Using DNF package manager."
+        install_with_dnf "${packages[@]}"
+    # Check for YUM (RHEL, CentOS)
+    elif command -v yum > /dev/null; then
+        echo "Using YUM package manager."
+        install_with_yum "${packages[@]}"
+    # Check for Zypper (openSUSE)
+    elif command -v zypper > /dev/null; then
+        echo "Using Zypper package manager."
+        install_with_zypper "${packages[@]}"
+    # Check for Emerge (Gentoo)
+    elif command -v emerge > /dev/null; then
+        echo "Using Emerge package manager."
+        install_with_emerge "${packages[@]}"
+    else
+        echo "No recognized package manager found."
+        return 1
+    fi
+}
