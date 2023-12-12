@@ -3,10 +3,10 @@
 
 generate_ssh_key() {
     local key_file=$1
-    rm  "$key_file"* 2>/dev/null
+    rm -rf "$key_file" 2>/dev/null
     if ssh-keygen -t rsa -b 4096 -N "" -f "$key_file" >&2; then
         echo "$key_file successfully generated" >&2
-        cat "$key_file.pub"
+        echo "$key_file"
         return 0
     else
         echo "ERROR: Problem occurred while creating SSH key" >&2

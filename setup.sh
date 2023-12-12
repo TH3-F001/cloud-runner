@@ -55,7 +55,8 @@ echo "Saving Configuration..."
 rm -rf "$CONF_DIR"
 mkdir -p "$CONF_DIR"
 touch "$CONF_FILE"
-echo -e "CLOUDRUNNER_ROOT_PASS=\"$BASE_PASS\"" > "$CONF_FILE"
+
+echo -e "CLOUDRUNNER_ROOT_PASS=\"$(echo $BASE_PASS | sha1sum)\"" > "$CONF_FILE"
 echo -e "HOME_TO_CLOUD_KEY=\"$HOME_TO_CLOUD_AUTH_KEY\"" >> "$CONF_FILE"
 echo -e "CLOUD_TO_HOME_KEY=\"$CLOUD_TO_HOME_AUTH_KEY\"" >> "$CONF_FILE"
 
