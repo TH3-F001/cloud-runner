@@ -24,9 +24,12 @@ lin stackscripts delete $(get_stackscript_id $STACKSCRIPT_LABEL) >/dev/null
 create_linode_stackscript "$CLOUDRUNNER_STACKSCRIPT" "$STACKSCRIPT_LABEL" "$CLOUDRUNNER_DEFAULT_IMAGE" >/dev/null
 
 echo -e "\nBuilding StackScript Arguments..."
+PRIV_KEY_DATA=$(cat "$CLOUD_TO_HOME_KEY")
+PUB_KEY_DATA=$(cat "$CLOUD_TO_HOME_KEY.pub")
+
 STACKSCRIPT_DATA=$(jq -n \
-                  --arg privKey "$CLOUD_TO_HOME_KEY" \
-                  --arg pubKey "$CLOUD_TO_HOME_KEY.pub" \
+                  --arg privKey "$PRIV_KEY_DATA" \
+                  --arg pubKey "$PUB_KEY_DATA" \
                   --arg sshPort "$SSH_PORT" \
                   --arg sshIp "$PUB_IP" \
                   --arg sshUser "$(whoami)" \
@@ -54,7 +57,7 @@ while ! ping -c 1 -W 1 "$LINODE_IP" &> /dev/null; do
     sleep 2
 done
 
-SLEEP_TIME=60
+SLEEP_TIME=120
 echo -e "\n$LINODE_IP is now responding to ping. Waiting for $SLEEP_TIME seconds..."
 sleep $SLEEP_TIME
 
@@ -62,6 +65,7 @@ sleep $SLEEP_TIME
 echo -e "\n Attempting to connect to $LINODE_IP via SSH..."
 if ssh -o StrictHostKeyChecking=no -T -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" -p $CLOUD_SSH_PORT "echo 'SSH connection successful' > /home/$SSH_USER/.ssh-test.txt"; then
     echo -e "\nSSH Connection Successful: Time to send your script!"
+    ssh -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" -p $CLOUD_SSH_PORT
 else
     echo -e "\nSSH Connection Failed: Unable to connect or write to the file."
 fi
@@ -71,4 +75,4 @@ fi
 # lin linodes delete $(get_linode_id $LINODE_LABEL)
 # lin linodes ls
 
-ssh -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" -p $CLOUD_SSH_PORT
+
