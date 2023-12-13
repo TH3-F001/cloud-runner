@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# <UDF name="PRIV_KEY" label="Private SSH Key" example="Private key for SSH authentication back home" />
+# <UDF name="PUB_KEY" label="Public SSH Key" example="Public key for SSH authentication back home" />
+# <UDF name="SSH_PORT" label="SSH Port" example="Port number for SSH connections back home" />
+# <UDF name="SSH_IP" label="SSH IP Address" example="Public IP address for SSH connections back home" />
+# <UDF name="SSH_USER" label="SSH Username" example="Username for SSH connections back home" />
+
+
 install_git_apt() {
     echo "Using apt to install git..."
     sudo apt-get update
@@ -47,8 +54,40 @@ CLOUD_PRIV_KEY="$PRIV_KEY"
 CLOUD_PUB_KEY="$PUB_KEY"
 HOME_SSH_PORT="$SSH_PORT"
 HOME_SSH_IP="$SSH_IP"
+HOME_SSH_USER=$SSH_USER
+
+echo "CLOUD_PRIV_KEY: $CLOUD_PRIV_KEY" &>>"$LOG"
+echo "CLOUD_PUB_KEY: $CLOUD_PUB_KEY" &>>"$LOG"
+echo "HOME_SSH_PORT: $HOME_SSH_PORT" &>>"$LOG"
+echo "HOME_SSH_IP: $HOME_SSH_IP" &>>"$LOG"
+.ssh/cloud-runner_rsa
+
+# Edit sshd_config for some tighter security
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+sed -i 's/^#Port 22/Port 42122/' /etc/ssh/sshd_config
+sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
 
+# Save HOME_SSH_PORT and HOME_IP to disk
+echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
+echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
+echo "$"
+
+# Allow for passwordless sudo
+echo "Adding new user to the sudoers file..." &>>"$LOG"
+echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
+
+declare -a DEPENDENCIES=(
+    "jq"
+    "go"
+)
+
+# Install Dependencies
+echo "Installing Dependencies..." &>>"$LOG"
 # Install Initial Dependencies 
 echo "Installing Initial Dependencies..." &>>"$LOG"
 
@@ -103,7 +142,7 @@ echo "Copying Authorized Keys to New User..." &>>"$LOG"
 mkdir -p "$USER_HOME"/.ssh &>>"$LOG"
 cp /root/.ssh/authorized_keys "$USER_HOME"/.ssh/ &>>"$LOG"
 chown -R "$NEW_USER":"$NEW_USER" "$USER_HOME"/.ssh &>>"$LOG"
-
+echo "$CLOUD_PUB_KEY" >> "$USER_HOME/.ssh/authorized_keys"
 
 # Assign proper permissions to .ssh directory
 chmod 700 "$USER_HOME"/.ssh &>>"$LOG"
@@ -123,11 +162,12 @@ sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_conf
 
 # Save HOME_SSH_PORT and HOME_IP to disk
 echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
-echo "$HOME_IP" > "$USER_HOME/cloud-runner/home_ip"
+echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
+echo "$"
 
 # Allow for passwordless sudo
-echo "Adding new user to the sudoers file..." &>>"$LOG"
-echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
+# echo "Adding new user to the sudoers file..." &>>"$LOG"
+# echo "cloud-runner ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
 
 declare -a DEPENDENCIES=(
     "jq"
@@ -138,4 +178,7 @@ declare -a DEPENDENCIES=(
 echo "Installing Dependencies..." &>>"$LOG"
 # Placeholder for user dependencies
 install_packages "${DEPENDENCIES[@]}" &>>"$LOG"
+
+systemctl restart sshd
+systemctl enable sshd
 

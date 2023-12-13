@@ -72,8 +72,8 @@ chmod 600 "$CONF_FILE"
 echo "Moving Scripts to .config"
 cp -r "$SCRIPT_DIR/libraries" "$CONF_DIR/"
 cp "$SCRIPT_DIR"/*.sh "$CONF_DIR/"
-mkdir -p "$CONF_DIR/access"
-cp "$HOME/.ssh/cloud-runner_rsa*" "$CONF_DIR/access"
+# mkdir -p "$CONF_DIR/access"
+# cp "$HOME/.ssh/cloudrunner*" "$CONF_DIR/access/"
 
 
 # Create a quick linode to determine the default Image ID for the account then destroy it

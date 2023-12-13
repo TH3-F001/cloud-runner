@@ -102,7 +102,7 @@ request_authorized_key() {
                 break
                 ;;
             *)
-                echo "That is not a valid answer. please select option 0-3"
+                echo "That is not a valid answer. please select option 0-3" >&2
                 ;;
         esac        
     done
@@ -131,8 +131,26 @@ request_confirmation() {
                 return 1
                 ;;
             *)
-                echo "Please enter y or n"
+                echo "Please enter y or n" 
                 ;;
         esac
+    done
+}
+
+request_port_number() {
+    local msg=$1
+    if [ -z "$msg" ]; then
+        msg="Please provide a port number"
+    fi
+
+    while true; do
+        local port=$(request_string "$msg")
+    
+        if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 0 ] && [ "$port" -le 65535 ]; then
+            echo "$port"
+            break
+        else
+            echo "Invalid value. Please enter an integer between 0 and 65,535." >&2
+        fi
     done
 }
