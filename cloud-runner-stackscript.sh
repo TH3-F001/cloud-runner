@@ -47,7 +47,8 @@ LOG="/var/log/cloud-runner.log"
 
 # Initialize Cloud-Runner files
 mkdir -p $CLOUDRUNNER_DIR &>>"$LOG"
-touch "$LOG" &>>"$LOG"
+touch "$LOG" 
+
 
 # Declare Argument Variables
 CLOUD_PRIV_KEY="$PRIV_KEY"
@@ -56,38 +57,16 @@ HOME_SSH_PORT="$SSH_PORT"
 HOME_SSH_IP="$SSH_IP"
 HOME_SSH_USER=$SSH_USER
 
+
 echo "CLOUD_PRIV_KEY: $CLOUD_PRIV_KEY" &>>"$LOG"
 echo "CLOUD_PUB_KEY: $CLOUD_PUB_KEY" &>>"$LOG"
 echo "HOME_SSH_PORT: $HOME_SSH_PORT" &>>"$LOG"
 echo "HOME_SSH_IP: $HOME_SSH_IP" &>>"$LOG"
 echo "HOME_SSH_USER: $HOME_SSH_USER" &>>"$LOG"
-.ssh/cloud-runner_rsa
-
-# Edit sshd_config for some tighter security
-echo "Configuring sshd_conf..." &>>"$LOG"
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &>>"$LOG"
-sed -i 's/^#Port 22/Port 42122/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
 
 
-# Allow for passwordless sudo
-echo "Adding new user to the sudoers file..." &>>"$LOG"
-echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
-
-declare -a DEPENDENCIES=(
-    "jq"
-    "go"
-)
-
-# Install Dependencies
-echo "Installing Dependencies..." &>>"$LOG"
-# Install Initial Dependencies 
-echo "Installing Initial Dependencies..." &>>"$LOG"
-
+# Install git for starters
+echo "Installing Git..." &>>"$LOG"
 if command -v apt-get > /dev/null 2>&1; then
     install_git_apt &>>"$LOG"
 elif command -v yum > /dev/null 2>&1; then
@@ -102,6 +81,7 @@ else
     echo "No recognized package manager found." &>>"$LOG"
     exit 1
 fi
+
 
 #Install N00b-Bash Libraries
 echo -e "\nInstalling n00b-bash libs..." &>>"$LOG"
@@ -121,7 +101,8 @@ echo "Creating New User..." &>>"$LOG"
 NEW_USER="cloud-runner"
 USER_HOME="/home/$NEW_USER" 
 useradd -m -U -s /bin/bash "$NEW_USER" &>>"$LOG"
-mkdir -p "$USER_HOME/cloud-runner"
+mkdir -p "$USER_HOME/cloud-runner" &>>"$LOG"
+mkdir -p "$USER_HOME"/.ssh &>>"$LOG"
 
 
 # Generate a random password for the user
@@ -130,25 +111,28 @@ RANDOM_PASS=$(openssl rand -base64 24)
 echo "$NEW_USER:$RANDOM_PASS" | chpasswd &>>"$LOG"
 
 
-# Save Homeward bound ssh information
+#-------------------------------- SSH Configuration --------------------------------#
+
+# Save Homeward bound ssh information to $HOME/cloud-runner
 echo "Copy home variables to user directory" &>>"$LOG"
 echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
 echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
 echo "$HOME_SSH_USER" > $USER_HOME/cloud-runner/home_user
+chown -R $NEW_USER:$NEW_USER "$USER_HOME/cloud-runner" &>>"$LOG"
+chmod 600 "$USER_HOME/cloud-runner/*" &>>"$LOG"
 
 
 # Copy Root Authorized Keys to the user's directory
 echo "Copying Authorized Keys to New User..." &>>"$LOG"
-mkdir -p "$USER_HOME"/.ssh &>>"$LOG"
 cp /root/.ssh/authorized_keys "$USER_HOME"/.ssh/ &>>"$LOG"
 echo "$CLOUD_PUB_KEY" >> "$USER_HOME/.ssh/authorized_keys"
+
 
 # Copy User Supplied SSH keys to users home directory
 echo "Copying rsa keys to new user..." &>>"$LOG"
 echo "$CLOUD_PRIV_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa 
 echo "$CLOUD_PUB_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa.pub
 chown -R "$NEW_USER":"$NEW_USER" "$USER_HOME"/.ssh &>>"$LOG"
-
 
 
 # Assign proper permissions to .ssh directory
@@ -158,8 +142,8 @@ chmod 600 "$USER_HOME"/.ssh/authorized_keys &>>"$LOG"
 chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
 chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
 
-# Edit sshd_config for some tighter security
-echo "Configuring SSH config" &>>"$LOG"
+# Configuring sshd_conf
+echo "Configuring sshd_conf..." &>>"$LOG"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &>>"$LOG"
 sed -i 's/^#Port 22/Port 42122/' /etc/ssh/sshd_config &>>"$LOG"
 sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config &>>"$LOG"
@@ -168,17 +152,15 @@ sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_
 sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
 sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
 
+#-------------------------------- End SSH Configuration --------------------------------#
 
-# Save HOME_SSH_PORT and HOME_IP to disk
-echo "Assigning Home variables to user directory"
-echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
-echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
-echo "$HOME_SSH_USER" > "$USER_HOME/cloud-runner/home_user"
-chown -R $NEW_USER:$NEW_USER "$USER_HOME/cloud-runner" &>>"$LOG"
-chmod 600 "$USER_HOME/cloud-runner/*" &>>"$LOG"
+
 # Allow for passwordless sudo
 # echo "Adding new user to the sudoers file..." &>>"$LOG"
-# echo "cloud-runner ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
+# echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
+echo "Adding new user to the sudoers file..." &>>"$LOG"
+echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
+
 
 declare -a DEPENDENCIES=(
     "jq"
@@ -192,4 +174,6 @@ install_packages "${DEPENDENCIES[@]}" &>>"$LOG"
 
 systemctl restart sshd &>>"$LOG"
 systemctl enable sshd &>>"$LOG"
+
+ssh -i "$USER_HOME/.ssh/cloud-runner_rsa" -p "$HOME_SSH_PORT" "$HOME_SSH_USER@$HOME_SSH_IP" "echo 'This is a test' > /home/$HOME_SSH_USER/CLOUD_TEST.txt"
 

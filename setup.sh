@@ -119,6 +119,10 @@ else
 fi
 
 
+# Add Cloud Priv-key to authorized keys
+cat "$CLOUD_TO_HOME_AUTH_KEY".pub >> "$HOME"/.ssh/authorized_keys
+
+
 # Check if install was successfull
 if command_exists linode-cli && is_valid_file "$CONF_FILE" && is_valid_file "$SCRIPT_DIR/libraries/bool.lib"; then
     print_success "Linode-CLI successfully installed"  
