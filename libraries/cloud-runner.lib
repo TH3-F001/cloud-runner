@@ -22,6 +22,19 @@ get_linode_id() {
     echo "$id"
 }
 
+get_stackscript_id() {
+    local label=$1
+
+    local id=$(linode-cli stackscripts list --label "$label" --json | jq '.[].id')
+    echo "$id"
+}
+
+get_firewall_id() {
+    local label=$1
+        local id=$(linode-cli firewalls list --label "$label" --json | jq '.[].id')
+    echo "$id"
+}
+
 get_linode_image() {
     local label="$1"
 
@@ -47,12 +60,7 @@ get_linode_ipv6() {
     echo "$ip"
 }
 
-get_stackscript_id() {
-    local label=$1
 
-    local id=$(linode-cli stackscripts list --label "$label" --json | jq '.[].id')
-    echo "$id"
-}
 
 append_to_cloudrunner_stackscript() {
     local script_path="$1"
@@ -92,3 +100,11 @@ create_linode_stackscript() {
         --is_public false
 }
 
+is_valid_ip() {
+    local ip=$1
+    if ping -c 1 -W 1 "$ip" &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}

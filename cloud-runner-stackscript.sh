@@ -7,34 +7,39 @@
 # <UDF name="SSH_USER" label="SSH Username" example="Username for SSH connections back home" />
 
 
-install_git_apt() {
-    echo "Using apt to install git..."
+install_apt() {
+    local pkg=$1
+    echo "Using apt to install $pkg..."
     sudo apt-get update
-    sudo apt-get install -y git
+    sudo apt-get install -y "$pkg"
 }
 
-# Function to install git using yum
-install_git_yum() {
-    echo "Using yum to install git..."
-    sudo yum install -y git
+# Function to install $pkg using yum
+install_yum() {
+    local pkg=$1
+    echo "Using yum to install $pkg..."
+    sudo yum install -y "$pkg"
 }
 
-# Function to install git using dnf
-install_git_dnf() {
-    echo "Using dnf to install git..."
-    sudo dnf install -y git
+# Function to install $pkg using dnf
+install_dnf() {
+    local pkg=$1
+    echo "Using dnf to install $pkg..."
+    sudo dnf install -y "$pkg"
 }
 
-# Function to install git using zypper
-install_git_zypper() {
-    echo "Using zypper to install git..."
-    sudo zypper install -y git
+# Function to install $pkg using zypper
+install_zypper() {
+    local pkg=$1
+    echo "Using zypper to install $pkg..."
+    sudo zypper install -y "$pkg"
 }
 
-# Function to install git using pacman
-install_git_pacman() {
-    echo "Using pacman to install git..."
-    sudo pacman -Syu git --noconfirm
+# Function to install $pkg using pacman
+install_pacman() {
+    local pkg=$1
+    echo "Using pacman to install $pkg..."
+    sudo pacman -Syu "$pkg" --noconfirm
 }
 
 
@@ -55,7 +60,8 @@ CLOUD_PRIV_KEY="$PRIV_KEY"
 CLOUD_PUB_KEY="$PUB_KEY"
 HOME_SSH_PORT="$SSH_PORT"
 HOME_SSH_IP="$SSH_IP"
-HOME_SSH_USER=$SSH_USER
+HOME_SSH_USER="$SSH_USER"
+
 
 
 echo "CLOUD_PRIV_KEY: $CLOUD_PRIV_KEY" &>>"$LOG"
@@ -68,15 +74,20 @@ echo "HOME_SSH_USER: $HOME_SSH_USER" &>>"$LOG"
 # Install git for starters
 echo "Installing Git..." &>>"$LOG"
 if command -v apt-get > /dev/null 2>&1; then
-    install_git_apt &>>"$LOG"
+    install_apt git 2>>"$LOG"
+    install_apt openssh-server 2>>"$LOG"
 elif command -v yum > /dev/null 2>&1; then
-    install_git_yum &>>"$LOG"
+    install_yum git 2>>"$LOG"
+    install_yum openssh-server 2>>"$LOG"
 elif command -v dnf > /dev/null 2>&1; then
-    install_git_dnf &>>"$LOG"
+    install_dnf git 2>>"$LOG"
+    install_dnf openssh-server 2>>"$LOG"
 elif command -v zypper > /dev/null 2>&1; then
-    install_git_zypper &>>"$LOG"
+    install_zypper git 2>>"$LOG"
+    install_zypper openssh-server 2>>"$LOG"
 elif command -v pacman > /dev/null 2>&1; then
-    install_git_pacman &>>"$LOG"
+    install_pacman git 2>>"$LOG"
+    install_pacman openssh 2>>"$LOG"
 else
     echo "No recognized package manager found." &>>"$LOG"
     exit 1
@@ -112,6 +123,21 @@ echo "$NEW_USER:$RANDOM_PASS" | chpasswd &>>"$LOG"
 
 
 #-------------------------------- SSH Configuration --------------------------------#
+INBOUND_SSH_PORT=42122
+
+
+# Stopping all ssh services to ensure sshd is used, and with a fresh configuration
+echo "Stopping all SSH services..." &>>"$LOG"
+systemctl stop sshd &>>"$LOG"
+systemctl disable sshd &>>"$LOG"
+systemctl stop ssh &>>"$LOG"
+systemctl disable ssh &>>"$LOG"
+systemctl stop ssh &>>"$LOG"
+systemctl disable ssh &>>"$LOG"
+systemctl stop dropbear &>>"$LOG"
+systemctl disable dropbear &>>"$LOG"
+
+
 
 # Save Homeward bound ssh information to $HOME/cloud-runner
 echo "Copy home variables to user directory" &>>"$LOG"
@@ -119,7 +145,7 @@ echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
 echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
 echo "$HOME_SSH_USER" > $USER_HOME/cloud-runner/home_user
 chown -R $NEW_USER:$NEW_USER "$USER_HOME/cloud-runner" &>>"$LOG"
-chmod 600 "$USER_HOME/cloud-runner/*" &>>"$LOG"
+chmod 600 "$USER_HOME"/cloud-runner/* &>>"$LOG"
 
 
 # Copy Root Authorized Keys to the user's directory
@@ -142,16 +168,39 @@ chmod 600 "$USER_HOME"/.ssh/authorized_keys &>>"$LOG"
 chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
 chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
 
+
+# Adding Iptables exception for new ssh port
+echo "Adding $INBOUND_SSH_PORT to iptables exceptions..." &>>"$LOG"
+sudo iptables -A INPUT -p tcp --dport "$INBOUND_SSH_PORT" -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT &>>"$LOG"
+sudo iptables -A OUTPUT -p tcp --sport "$INBOUND_SSH_PORT" -m conntrack --ctstate ESTABLISHED -j ACCEPT &>>"$LOG"
+
 # Configuring sshd_conf
 echo "Configuring sshd_conf..." &>>"$LOG"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &>>"$LOG"
-sed -i 's/^#Port 22/Port 42122/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
-sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config &>>"$LOG"
+# Remove existing settings
+sed -i '/^#Port 22/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^Port [0-9]*/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^#PermitRootLogin/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^PermitRootLogin/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^#PasswordAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^PasswordAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^#PubkeyAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
+sed -i '/^PubkeyAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
 
+# Append new settings
+echo "Port $INBOUND_SSH_PORT" >> /etc/ssh/sshd_config
+echo "PermitRootLogin no" >> /etc/ssh/sshd_config 
+echo "PasswordAuthentication no" >> /etc/ssh/sshd_config 
+echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config 
+
+# Enable sshd
+echo "Starting sshd..." &>>"$LOG"
+systemctl start sshd &>>"$LOG"
+systemctl restart sshd &>>"$LOG"
+systemctl enable sshd &>>"$LOG"
+systemctl start ssh &>>"$LOG"
+systemctl restart ssh &>>"$LOG"
+systemctl enable ssh &>>"$LOG"
 #-------------------------------- End SSH Configuration --------------------------------#
 
 
@@ -172,8 +221,6 @@ echo "Installing Dependencies..." &>>"$LOG"
 # Placeholder for user dependencies
 install_packages "${DEPENDENCIES[@]}" &>>"$LOG" 
 
-systemctl restart sshd &>>"$LOG"
-systemctl enable sshd &>>"$LOG"
 
+echo "ssh -i \"$USER_HOME/.ssh/cloud-runner_rsa\" -p \"$HOME_SSH_PORT\" \"$HOME_SSH_USER@$HOME_SSH_IP\" \"echo 'This is a test' > /home/$HOME_SSH_USER/CLOUD_TEST.txt\"" &>>"$LOG"
 ssh -i "$USER_HOME/.ssh/cloud-runner_rsa" -p "$HOME_SSH_PORT" "$HOME_SSH_USER@$HOME_SSH_IP" "echo 'This is a test' > /home/$HOME_SSH_USER/CLOUD_TEST.txt"
-

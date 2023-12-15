@@ -5,6 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
 VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
 CONF_DIR="$HOME/.config/cloud-runner"
+CLOUD_SSH_PORT=42122
 MASTER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
 
@@ -33,7 +34,7 @@ fi
 
 
 # Run initial Linode setup
-echo "Running first time configuration dialog..."
+echo -e "\nRunning first time configuration dialog..."
 linode-cli configure --token
 
 
@@ -42,18 +43,43 @@ echo "Akamai requires a root password for your new Linode. In order to adhere to
 BASE_PASS=$(request_string "Please provide your desired root password for your Linode cloud runner")
 HOME_TO_CLOUD_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-cloud_rsa")
 CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa")
-SSH_PORT=$(request_port_number "Which Public facing SSH port should cloud-runner send output to?")
-PUB_IP=$(curl ipinfo.io/ip)
+SSH_PORT=$(request_port_number "Which Public facing SSH port should your linode send output to?")
 
 # Gather User supplied dependencies.
-echo "Cloud-Runner allows you to specify dependencies to install on boot as long as they exist in your default image's package manager"
+echo -e "\nCloud-Runner allows you to specify dependencies to install on boot as long as they exist in your default image's package manager"
 if request_confirmation "Would You like to install any additional dependencies on your linode's first boot?"; then
     read -rp "Enter the list of dependencies (separated by spaces): " USER_DEPS
 fi
 
+# Create a linode firewall with open user-supplied ssh port
+FIREWALL_LABEL="Cloud-Runner_Firewall"
+linode-cli firewalls delete $(get_firewall_id "$FIREWALL_LABEL" 2>/dev/null) 2>/dev/null
+linode-cli firewalls create \
+    --label "$FIREWALL_LABEL" \
+    --rules.inbound_policy DROP \
+    --rules.outbound_policy ACCEPT \
+    --rules.inbound '[{"action": "ACCEPT", "protocol": "ICMP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}, {"action": "ACCEPT", "ports": "'"$CLOUD_SSH_PORT"'", "protocol": "TCP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}]' \
+    --rules.outbound '[{"action": "ACCEPT", "ports": "'"$SSH_PORT"'", "protocol": "TCP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}]'
+
+
+# Find out public IP (Big robust booty)
+services=(
+    "https://api.ipify.org"
+    "https://ifconfig.me"
+    "https://ipinfo.io/ip"
+    "https://icanhazip.com"
+    "https://checkip.amazonaws.com"
+)
+
+for service in "${services[@]}"; do
+    PUB_IP=$(curl -s $service)
+    if [[ -n "$PUB_IP" ]] && is_valid_ip "$PUB_IP"; then
+        break
+    fi
+done
 
 # Write the configuration info disk
-echo "Saving Configuration..."
+echo -e "\nSaving Configuration..."
 rm -rf "$CONF_DIR"
 mkdir -p "$CONF_DIR"
 touch "$CONF_FILE"
@@ -69,7 +95,7 @@ chmod 600 "$CONF_FILE"
 
 
 # Move the contents of the project to CONF_DIR
-echo "Moving Scripts to .config"
+echo -e "\nMoving Scripts to .config"
 cp -r "$SCRIPT_DIR/libraries" "$CONF_DIR/"
 cp "$SCRIPT_DIR"/*.sh "$CONF_DIR/"
 # mkdir -p "$CONF_DIR/access"
@@ -77,19 +103,19 @@ cp "$SCRIPT_DIR"/*.sh "$CONF_DIR/"
 
 
 # Create a quick linode to determine the default Image ID for the account then destroy it
-echo "Creating a small linode to grab default image from..."
+echo -e "\nCreating a small linode to grab default image from..."
 linode-cli linodes create --type "g6-standard-1" --root_pass "\"$(encode_password $BASE_PASS)\"" --label "Cloud-Tester"
 DEFAULT_IMAGE=$(get_linode_image "Cloud-Tester")
 TMP_IMG_ID=$(get_linode_id "Cloud-Tester")
-echo "Deleting temporary linode..."
+echo -e "\nDeleting temporary linode..."
 if ! linode-cli linodes delete "$TMP_IMG_ID"; then
-    echo "ERROR: Linode created but not deleted. Please manually delete!!!"
+    echo -e "\nERROR: Linode created but not deleted. Please manually delete!!!"
 fi
 echo -e "CLOUDRUNNER_DEFAULT_IMAGE=\"$DEFAULT_IMAGE\"" >> "$CONF_FILE"
 
 
 # Add user dependencies to existing dependencies in the stack script
-echo "Adding Dependencies to the Master Stackscript"
+echo -e "\nAdding Dependencies to the Master Stackscript"
 IFS=' ' read -r -a USER_DEPS_ARRAY <<< "$USER_DEPS"
 DEPS_STRING=$(printf " \"%s\"" "${USER_DEPS_ARRAY[@]}")
 DEPS_STRING=${DEPS_STRING:1}
@@ -99,7 +125,7 @@ sed -i "s/# Placeholder for user dependencies/DEPENDENCIES+=($DEPS_STRING)/" "$M
 # Install sshd if needed 
 if ! type sshd; then
     if ! install_packages sshd; then
-        echo "Failed to Install sshd. Please install, enable, and allow pubkey authentication"
+        echo -e "\nFailed to Install sshd. Please install, enable, and allow pubkey authentication"
     fi
 fi
 
