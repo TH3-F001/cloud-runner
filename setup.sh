@@ -5,7 +5,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
 VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
 CONF_DIR="$HOME/.config/cloud-runner"
-CLOUD_SSH_PORT=42122
 MASTER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
 
@@ -58,7 +57,7 @@ linode-cli firewalls create \
     --label "$FIREWALL_LABEL" \
     --rules.inbound_policy DROP \
     --rules.outbound_policy ACCEPT \
-    --rules.inbound '[{"action": "ACCEPT", "protocol": "ICMP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}, {"action": "ACCEPT", "ports": "'"$CLOUD_SSH_PORT"'", "protocol": "TCP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}]' \
+    --rules.inbound '[{"action": "ACCEPT", "protocol": "ICMP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}, {"action": "ACCEPT", "ports": "'"22"'", "protocol": "TCP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}]' \
     --rules.outbound '[{"action": "ACCEPT", "ports": "'"$SSH_PORT"'", "protocol": "TCP", "addresses": {"ipv4": ["0.0.0.0/0"], "ipv6": ["::/0"]}}]'
 
 

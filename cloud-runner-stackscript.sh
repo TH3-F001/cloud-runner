@@ -123,20 +123,6 @@ echo "$NEW_USER:$RANDOM_PASS" | chpasswd &>>"$LOG"
 
 
 #-------------------------------- SSH Configuration --------------------------------#
-INBOUND_SSH_PORT=42122
-
-
-# Stopping all ssh services to ensure sshd is used, and with a fresh configuration
-echo "Stopping all SSH services..." &>>"$LOG"
-systemctl stop sshd &>>"$LOG"
-systemctl disable sshd &>>"$LOG"
-systemctl stop ssh &>>"$LOG"
-systemctl disable ssh &>>"$LOG"
-systemctl stop ssh &>>"$LOG"
-systemctl disable ssh &>>"$LOG"
-systemctl stop dropbear &>>"$LOG"
-systemctl disable dropbear &>>"$LOG"
-
 
 
 # Save Homeward bound ssh information to $HOME/cloud-runner
@@ -169,17 +155,10 @@ chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
 chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
 
 
-# Adding Iptables exception for new ssh port
-echo "Adding $INBOUND_SSH_PORT to iptables exceptions..." &>>"$LOG"
-sudo iptables -A INPUT -p tcp --dport "$INBOUND_SSH_PORT" -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT &>>"$LOG"
-sudo iptables -A OUTPUT -p tcp --sport "$INBOUND_SSH_PORT" -m conntrack --ctstate ESTABLISHED -j ACCEPT &>>"$LOG"
-
 # Configuring sshd_conf
 echo "Configuring sshd_conf..." &>>"$LOG"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &>>"$LOG"
 # Remove existing settings
-sed -i '/^#Port 22/d' /etc/ssh/sshd_config &>>"$LOG"
-sed -i '/^Port [0-9]*/d' /etc/ssh/sshd_config &>>"$LOG"
 sed -i '/^#PermitRootLogin/d' /etc/ssh/sshd_config &>>"$LOG"
 sed -i '/^PermitRootLogin/d' /etc/ssh/sshd_config &>>"$LOG"
 sed -i '/^#PasswordAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
@@ -188,7 +167,6 @@ sed -i '/^#PubkeyAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
 sed -i '/^PubkeyAuthentication/d' /etc/ssh/sshd_config &>>"$LOG"
 
 # Append new settings
-echo "Port $INBOUND_SSH_PORT" >> /etc/ssh/sshd_config
 echo "PermitRootLogin no" >> /etc/ssh/sshd_config 
 echo "PasswordAuthentication no" >> /etc/ssh/sshd_config 
 echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config 

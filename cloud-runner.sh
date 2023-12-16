@@ -6,7 +6,6 @@ CONF_DIR="$HOME/.config/cloud-runner"
 CONF_FILE="$CONF_DIR/cloud-reunner.conf"
 CLOUDRUNNER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 SSH_USER="cloud-runner"
-CLOUD_SSH_PORT=42122
 LINODE_LABEL="Cloud-Runner"
 FIREWALL_LABEL="Cloud-Runner_Firewall"
 STACKSCRIPT_LABEL="$LINODE_LABEL-Script"
@@ -54,6 +53,8 @@ sleep 1
 echo -e "\nGetting Linode's IP Address..."
 LINODE_IP=$(get_linode_ipv4 "$LINODE_LABEL")
 
+echo -e "\nWaiting for Cloud-Runner to deploy"
+sleep 120
 echo -e "\nPinging $LINODE_LABEL at $LINODE_IP until it responds..."
 while ! ping -c 1 -W 1 "$LINODE_IP" &> /dev/null; do
     echo "Waiting for $LINODE_IP to respond..."
@@ -66,12 +67,12 @@ sleep $SLEEP_TIME
 
 # Attempt to connect via SSH
 echo -e "\n Attempting to connect to $LINODE_IP via SSH..."
-if ssh -o StrictHostKeyChecking=no -T -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" -p $CLOUD_SSH_PORT "echo 'SSH connection successful' > /home/$SSH_USER/.ssh-test.txt"; then
+if ssh -o StrictHostKeyChecking=no -T -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP"  "echo 'SSH connection successful' > /home/$SSH_USER/.ssh-test.txt"; then
     echo -e "\nSSH Connection Successful: Time to send your script!"
-    ssh -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" -p $CLOUD_SSH_PORT
+    ssh -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" 
 else
     echo -e "\nSSH Connection Failed: Unable to connect or write to the test file."
-    echo "ssh -o StrictHostKeyChecking=no -i $HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP -p $CLOUD_SSH_PORT"
+    echo "ssh -o StrictHostKeyChecking=no -i $HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP "
     echo "$(encode_password $CLOUDRUNNER_ROOT_PASS)"
 fi
 
