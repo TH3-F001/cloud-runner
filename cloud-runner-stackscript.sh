@@ -200,5 +200,6 @@ echo "Installing Dependencies..." &>>"$LOG"
 install_packages "${DEPENDENCIES[@]}" &>>"$LOG" 
 
 
-echo "ssh -i \"$USER_HOME/.ssh/cloud-runner_rsa\" -p \"$HOME_SSH_PORT\" \"$HOME_SSH_USER@$HOME_SSH_IP\" \"echo 'This is a test' > /home/$HOME_SSH_USER/CLOUD_TEST.txt\"" &>>"$LOG"
-ssh -i "$USER_HOME/.ssh/cloud-runner_rsa" -p "$HOME_SSH_PORT" "$HOME_SSH_USER@$HOME_SSH_IP" "echo 'This is a test' > /home/$HOME_SSH_USER/CLOUD_TEST.txt"
+echo "scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i $USER_HOME/.ssh/cloud-runner_rsa   $LOG cloud-runner@$HOME_SSH_IP:/home/$HOME_SSH_USER/Cloud-Runner/results/StackScript.log" &>> "$LOG"
+scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i "$USER_HOME"/.ssh/cloud-runner_rsa "$LOG" cloud-runner@"$HOME_SSH_IP":/home/"$HOME_SSH_USER"/Cloud-Runner/results/StackScript.log &>> "$LOG"
+
