@@ -30,8 +30,10 @@ sudo groupdel "$SHARED_GROUP"
 # Delete SSH keys
 echo -e "\nDeleting Cloud-Runner ssh keys"
 grep -vF "$(cat $CLOUD_TO_HOME_KEY.pub)" "$AUTHORIZED_KEYS" > temp && mv temp "$AUTHORIZED_KEYS"
-rm "$HOME_TO_CLOUD_KEY"*
-rm "$CLOUD_TO_HOME_KEY"*
+rm "$HOME_TO_CLOUD_KEY"
+rm "$HOME_TO_CLOUD_KEY.pub"
+rm "$CLOUD_TO_HOME_KEY"
+rm "$CLOUD_TO_HOME_KEY.pub"
 
 # Delete the install/config directory
 echo -e "Deleting $CONF_DIR"

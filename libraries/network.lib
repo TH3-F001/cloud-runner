@@ -19,3 +19,8 @@ get_untrusted_dns_resolver_list() {
 
     wget -q https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt -O "$OUTPUT_FILE"
 }
+
+port_is_open() {
+    nc -z -w5 "$1" "$2" &> /dev/null
+    return $?
+}

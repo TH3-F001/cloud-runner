@@ -8,6 +8,8 @@ declare -A apt_packages=(
     [go]="golang"
     [make]="build-essential"
     [sqlite]="sqlite3"
+    [sshd]="openssh-server"
+    [nc]="netcat"
 )
 
 declare -A yum_packages=(
@@ -20,6 +22,8 @@ declare -A yum_packages=(
     [wget]="sudo yum install wget -y"
     [sqlite]="sudo yum install sqlite3 -y"
     [jq]="sudo yum install jq -y"
+    [sshd]="sudo yum install openssh-server -y"
+    [nc]="sudo yum install nc -y"
 )
 
 declare -A dnf_packages=(
@@ -32,11 +36,15 @@ declare -A dnf_packages=(
     [wget]="sudo dnf install wget -y"
     [sqlite]="sudo dnf install sqlite3"
     [jq]="sudo dnf install jq -y"
+    [sshd]="sudo dnf install openssh-server -y"
+    [nc]="sudo dnf install nc -y"
 )
 
 declare -A pacman_packages=(
     [pip3]="python-pip"
     [pipx]="python-pipx"
+    [sshd]="openssh"
+    [nc]="gnu-netcat"
 )
 
 declare -A zypper_packages=(
@@ -53,6 +61,7 @@ declare -A emerge_packages=(
     [expect]="dev-tcltk/expect"
     [sqlite]="dev-db/sqlite"
     [jq]="app-misc/jq"
+    [sshd]="net-misc/openssh"
 )
 
 
