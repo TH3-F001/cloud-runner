@@ -9,14 +9,15 @@ MASTER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
 
 # Initial sudo request to cache credentials for the remainder of the script
-sudo echo -e "Starting Cloud-Runner Configuration..."
+echo -e "sudo access is required to set up cloud-runner."
+sudo echo -e "\nStarting Cloud-Runner Configuration..."
 
 #region Install and source n00b-bash libraries
 
 echo -e "\n📦 Installing n00b-bash libs..."
 TMP_DIR="/tmp/n00b-bash"
 rm -rf $TMP_DIR 2>/dev/null
-git clone https://github.com/TH3-F001/n00b-bash.git "$TMP_DIR" >/dev/null
+git clone https://github.com/TH3-F001/n00b-bash.git "$TMP_DIR" &>/dev/null
 mkdir -p "$LIB_SCRIPT_DIR"
 cp "$TMP_DIR"/*.lib "$LIB_SCRIPT_DIR"
 
@@ -26,11 +27,19 @@ done
 #endregion
 
 
+#region Install nc
+
+if ! command_exists nc; then 
+    install_packages nc
+fi
+#endregion
+
 #region Linode Configuration
 
 # Install Linode
+echo -e "\nChecking If linode-cli is installed..."
 if ! command_exists linode-cli; then
-    echo -e "\n📦 Installing linode-cli."
+    echo -e "\t📦 Installing linode-cli..."
     pipx install linode-cli
     "$VENV_DIR/bin/python3" -m pip install boto3
 else
@@ -38,25 +47,57 @@ else
 fi
 
 # Run initial Linode setup
-echo -e "\nRunning first time configuration dialog..."
+echo -e "\nRunning first time configuration dialog...\n\n"
 linode-cli configure --token
 #endregion
 
 
 #region Gather user input
 
-echo -e "\nAkamai requires a root password for your new Linode. In order to adhere to their password requirements, your password will be encoded"
+echo -e "\nAkamai requires a root password for your new Linode. In order to adhere to their password requirements, your password will be encoded.\n"
 BASE_PASS=$(request_string "Please provide your desired root password for your Linode cloud runner")
-HOME_TO_CLOUD_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-cloud_rsa" 2>/dev/null) 
-CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa" 2>/dev/null)
 echo -e "\nCloud-Runner requires the you have an open SSH port to the internet so it can securely transfer results."
 SSH_PORT=$(request_port_number "Which external SSH port should your linode report back to?")
-echo -e "\nDont forget to open port $SSH_PORT on you're router's firewall!"
+echo -e "\t[ DONT FORGET TO OPEN $SSH_PORT ON YOUR ROUTER'S FIREWALL! ]"
 
 # Gather User supplied dependencies.
 echo -e "\nCloud-Runner allows you to specify dependencies to install on boot as long as they exist in your default image's package manager"
 if request_confirmation "Would You like to install any additional dependencies on your linode's first boot?"; then
-    read -rp "Enter the list of dependencies (separated by spaces): " USER_DEPS
+    echo -e "\nEnter the list of dependencies (separated by spaces):"
+    read -rp "> " USER_DEPS
+fi
+#endregion
+
+
+#region SSH configuration
+
+# Install sshd if needed
+echo -e "\nChecking that sshd exists..."
+if ! type sshd; then
+    echo -e "sshd doesnt exist"
+    if ! install_packages sshd; then
+        echo -e "\nFailed to Install sshd. Please install, enable, and allow pubkey authentication"
+    fi
+fi
+
+# Create SSH keys for both inbound and outbound connections
+HOME_TO_CLOUD_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-cloud_rsa" 2>/dev/null) 
+CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa" 2>/dev/null)
+
+
+# Allow Pubkey Authentication
+sudo sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
+sudo sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
+
+# Enable sshd if it isnt already enabled, restart it if it is
+if ! systemctl is-enabled sshd &> /dev/null; then
+    sudo systemctl enable sshd
+    sudo systemctl start sshd
+    if ! sudo systemctl status sshd; then
+        echo "An error occurred while enabling sshd. please investigate and enable"
+    fi
+else
+    sudo systemctl restart sshd
 fi
 #endregion
 
@@ -138,32 +179,6 @@ IFS=' ' read -r -a USER_DEPS_ARRAY <<< "$USER_DEPS"
 DEPS_STRING=$(printf " \"%s\"" "${USER_DEPS_ARRAY[@]}")
 DEPS_STRING=${DEPS_STRING:1}
 sed -i "s/# Placeholder for user dependencies/DEPENDENCIES+=($DEPS_STRING)/" "$MASTER_STACKSCRIPT"
-#endregion
-
-
-#region SSH configuration
-
-# Install sshd if needed 
-if ! type sshd; then
-    if ! install_packages sshd; then
-        echo -e "\nFailed to Install sshd. Please install, enable, and allow pubkey authentication"
-    fi
-fi
-
-# Allow Pubkey Authentication
-sudo sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
-sudo sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
-
-# Enable sshd if it isnt already enabled, restart it if it is
-if ! systemctl is-enabled sshd &> /dev/null; then
-    sudo systemctl enable sshd
-    sudo systemctl start sshd
-    if ! sudo systemctl status sshd; then
-        echo "An error occurred while enabling sshd. please investigate and enable"
-    fi
-else
-    sudo systemctl restart sshd
-fi
 #endregion
 
 
@@ -260,6 +275,14 @@ else
     checklist+=("File '$SCRIPT_DIR/libraries/bool.lib' is not valid ❌")
 fi
 
+# Check for successfull inbound SSH connection
+
+if port_is_open "$PUB_IP" "$SSH_PORT"; then
+    checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is open ✔️")
+else
+    checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is not open or reachable ❌")
+fi
+
 # Check if linode-cli command exists
 if command_exists linode-cli; then
     checklist+=("Command 'linode-cli' exists ✔️")
@@ -281,4 +304,3 @@ for item in "${checklist[@]}"; do
 done
 
 echo "All checks passed successfully."
-#endregion
