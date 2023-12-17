@@ -5,6 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
 VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
 CONF_DIR="$HOME/.config/cloud-runner"
+INSTALL_DIR=/opt/cloud-runner
 MASTER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
 
@@ -190,7 +191,7 @@ NEW_USER="cloud-runner"
 NEW_USER_HOME="/home/$NEW_USER/"
 NEW_USER_SSH_DIR="$NEW_USER_HOME/.ssh"
 SHARED_GROUP="crunner"
-SHARED_DIR="$HOME/cloud-runner"
+SHARED_DIR="/opt/cloud-runner/"
 
 # Create user and add to group in order to share a folder
 sudo useradd -m "$NEW_USER"
@@ -206,10 +207,15 @@ sudo chmod 700 "$NEW_USER_SSH_DIR"
 sudo chmod 600 "$NEW_USER_SSH_DIR/authorized_keys"
 
 # Initialize shared file for cloud-runner output
-mkdir -p "$SHARED_DIR"
+sudo mkdir -p "$SHARED_DIR"
 sudo chown -R :"$SHARED_GROUP" "$SHARED_DIR"
-sudo chmod -R g+w "$SHARED_DIR"
+sudo chmod -R g+rw "$SHARED_DIR"
 sudo chmod g+s "$SHARED_DIR"
+sudo chcon -t ssh_home_t "$SHARED_DIR" &>/dev/null
+
+# Link shared folder to home directory
+rm -rf "$HOME/cloud_runner"
+sudo ln -s "$SHARED_DIR" "$HOME/cloud-runner"
 #endregion
 
 
@@ -304,3 +310,4 @@ for item in "${checklist[@]}"; do
 done
 
 echo "All checks passed successfully."
+#endregion

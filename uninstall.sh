@@ -7,7 +7,7 @@ CONF_DIR="$HOME/.config/cloud-runner"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
 CLOUD_RUNNER_USER="cloud-runner"
 SHARED_GROUP="crunner"
-SHARED_DIR=$HOME/cloud-runner
+SHARED_DIR=/opt/cloud-runner/
 CURRENT_USER=$(whoami)
 AUTHORIZED_KEYS="$HOME/.ssh/authorized_keys"
 
@@ -38,5 +38,7 @@ rm "$CLOUD_TO_HOME_KEY.pub"
 # Delete the install/config directory
 echo -e "Deleting $CONF_DIR"
 rm -rf "$CONF_DIR"
+rm -rf "$HOME/cloud-runner"
+sudo rm -rf "$SHARED_DIR"
 
 echo -e "cloud-runner successfully uninstalled."
