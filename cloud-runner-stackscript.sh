@@ -63,8 +63,6 @@ HOME_SSH_IP="$SSH_IP"
 HOME_SSH_USER="$SSH_USER"
 
 
-
-echo "CLOUD_PRIV_KEY: $CLOUD_PRIV_KEY" &>>"$LOG"
 echo "CLOUD_PUB_KEY: $CLOUD_PUB_KEY" &>>"$LOG"
 echo "HOME_SSH_PORT: $HOME_SSH_PORT" &>>"$LOG"
 echo "HOME_SSH_IP: $HOME_SSH_IP" &>>"$LOG"
@@ -106,6 +104,18 @@ for LIB_FILE in "$LIB_SCRIPT_DIR"/*\.lib; do
     source "$LIB_FILE"
 done
 
+# Install Dependencies
+declare -a DEPENDENCIES=(
+    "jq"
+    "go"
+    "sshfs"
+)
+
+echo "Installing Dependencies..." &>>"$LOG"
+# Placeholder for user dependencies
+install_packages "${DEPENDENCIES[@]}" &>>"$LOG" 
+
+
 
 # Create New User
 echo "Creating New User..." &>>"$LOG"
@@ -114,7 +124,8 @@ USER_HOME="/home/$NEW_USER"
 useradd -m -U -s /bin/bash "$NEW_USER" &>>"$LOG"
 mkdir -p "$USER_HOME/cloud-runner" &>>"$LOG"
 mkdir -p "$USER_HOME"/.ssh &>>"$LOG"
-
+mkdir -p "$USER_HOME/cloud-runner/input"
+mkdir -p "$USER_HOME/cloud-runner/output"
 
 # Generate a random password for the user
 echo "Generating Random Password..." &>>"$LOG"
@@ -155,6 +166,9 @@ chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
 chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
 
 
+# Set up SSHFS
+
+
 # Configuring sshd_conf
 echo "Configuring sshd_conf..." &>>"$LOG"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak &>>"$LOG"
@@ -188,16 +202,6 @@ systemctl enable ssh &>>"$LOG"
 echo "Adding new user to the sudoers file..." &>>"$LOG"
 echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
 
-
-declare -a DEPENDENCIES=(
-    "jq"
-    "go"
-)
-
-# Install Dependencies
-echo "Installing Dependencies..." &>>"$LOG"
-# Placeholder for user dependencies
-install_packages "${DEPENDENCIES[@]}" &>>"$LOG" 
 
 
 echo "scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i $USER_HOME/.ssh/cloud-runner_rsa   $LOG cloud-runner@$HOME_SSH_IP:/opt/cloud-runner/stackscript.log" &>> "$LOG"

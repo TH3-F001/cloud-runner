@@ -28,10 +28,14 @@ done
 #endregion
 
 
-#region Install nc
+#region Install generic dependencies
 
 if ! command_exists nc; then 
     install_packages nc
+fi
+
+if ! command_exists sshfs; then
+    install_packages sshfs
 fi
 #endregion
 
@@ -212,6 +216,8 @@ sudo chown -R :"$SHARED_GROUP" "$SHARED_DIR"
 sudo chmod -R g+rw "$SHARED_DIR"
 sudo chmod g+s "$SHARED_DIR"
 sudo chcon -t ssh_home_t "$SHARED_DIR" &>/dev/null
+
+# Set up SSHFS on shared file
 
 # Link shared folder to home directory
 rm -rf "$HOME/cloud_runner"
