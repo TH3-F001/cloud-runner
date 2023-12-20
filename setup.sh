@@ -5,9 +5,14 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LIB_SCRIPT_DIR="$SCRIPT_DIR/libraries"
 VENV_DIR="$HOME/.local/pipx/venvs/linode-cli/"
 CONF_DIR="$HOME/.config/cloud-runner"
-INSTALL_DIR=/opt/cloud-runner
 MASTER_STACKSCRIPT="$CONF_DIR/cloud-runner-stackscript.sh"
 CONF_FILE="$CONF_DIR/cloud-runner.conf"
+
+# Tool Folder Structure
+CLOUDRUNNER_DIR="$HOME/cloud-runner"
+OUTPUT_DIR="$CLOUDRUNNER_DIR/output"
+CLOUD_SHARE_DIR="/opt/cloud-runner/"
+CLOUD_SHARE_LINK="$CLOUDRUNNER_DIR/cloud"
 
 # Initial sudo request to cache credentials for the remainder of the script
 echo -e "sudo access is required to set up cloud-runner."
@@ -62,8 +67,8 @@ linode-cli configure --token
 echo -e "\nAkamai requires a root password for your new Linode. In order to adhere to their password requirements, your password will be encoded.\n"
 BASE_PASS=$(request_string "Please provide your desired root password for your Linode cloud runner")
 echo -e "\nCloud-Runner requires the you have an open SSH port to the internet so it can securely transfer results."
-SSH_PORT=$(request_port_number "Which external SSH port should your linode report back to?")
-echo -e "\t[ DONT FORGET TO OPEN $SSH_PORT ON YOUR ROUTER'S FIREWALL! ]"
+# SSH_PORT=$(request_port_number "Which external SSH port should your linode report back to?")
+# echo -e "\t[ DONT FORGET TO OPEN $SSH_PORT ON YOUR ROUTER'S FIREWALL! ]"
 
 # Gather User supplied dependencies.
 echo -e "\nCloud-Runner allows you to specify dependencies to install on boot as long as they exist in your default image's package manager"
@@ -87,10 +92,13 @@ fi
 
 # Create SSH keys for both inbound and outbound connections
 HOME_TO_CLOUD_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-cloud_rsa" 2>/dev/null) 
-CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa" 2>/dev/null)
+# CLOUD_TO_HOME_AUTH_KEY=$(generate_ssh_key "$HOME/.ssh/cloudrunner-to-home_rsa" 2>/dev/null)
 
 
-# Allow Pubkey Authentication
+# Allow Pubkey AuthenticationCLOUDRUNNER_DIR="$HOME/cloud-runner"
+OUTPUT_DIR="$CLOUDRUNNER_DIR/output"
+CLOUD_SHARE_DIR="/opt/cloud-runner/"
+CLOUD_SHARE_LINK="$CLOUDRUNNER_DIR/cloud"
 sudo sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
 sudo sed -i 's/^PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null
 
@@ -123,19 +131,19 @@ fi
 
 #region Find out public IP Address
 
-services=(
-    "https://api.ipify.org"
-    "https://ifconfig.me"
-    "https://ipinfo.io/ip"
-    "https://icanhazip.com"
-    "https://checkip.amazonaws.com"
-)
-for service in "${services[@]}"; do
-    PUB_IP=$(curl -s $service)
-    if [[ -n "$PUB_IP" ]] && is_valid_ip "$PUB_IP"; then
-        break
-    fi
-done
+# services=(
+#     "https://api.ipify.org"
+#     "https://ifconfig.me"
+#     "https://ipinfo.io/ip"
+#     "https://icanhazip.com"
+#     "https://checkip.amazonaws.com"
+# )
+# for service in "${services[@]}"; do
+#     PUB_IP=$(curl -s $service)
+#     if [[ -n "$PUB_IP" ]] && is_valid_ip "$PUB_IP"; then
+#         break
+#     fi
+# done
 #endregion
 
 
@@ -160,14 +168,26 @@ rm -rf "$CONF_DIR"
 mkdir -p "$CONF_DIR"
 touch "$CONF_FILE"
 
+# For building the linode
 echo -e "CLOUDRUNNER_ROOT_PASS=\"$(echo $BASE_PASS | sha1sum)\"" > "$CONF_FILE"
 echo -e "HOME_TO_CLOUD_KEY=\"$HOME_TO_CLOUD_AUTH_KEY\"" >> "$CONF_FILE"
-echo -e "CLOUD_TO_HOME_KEY=\"$CLOUD_TO_HOME_AUTH_KEY\"" >> "$CONF_FILE"
-echo -e "SSH_PORT=\"$SSH_PORT\"" >>$CONF_FILE
-echo -e "PUB_IP=\"$PUB_IP\"" >>$CONF_FILE
 echo -e "CLOUDRUNNER_DEFAULT_IMAGE=\"$DEFAULT_IMAGE\"" >> "$CONF_FILE"
+
+# For output folder structure
+echo -e "CLOUDRUNNER_DIR=\"$CLOUDRUNNER_DIR\"" >> "$CONF_FILE"
+echo -e "OUTPUT_DIR=\"$OUTPUT_DIR\"" >> "$CONF_FILE"
+echo -e "CLOUD_SHARE_DIR=\"$CLOUD_SHARE_DIR\"" >> "$CONF_FILE"
+echo -e "CLOUD_SHARE_LINK=\"$CLOUD_SHARE_LINK\"" >> "$CONF_FILE"
+echo -e "LINODE_SHARE=\"/home/cloud-runner/cloud-runner\"" >> "$CONF_FILE"
+
+# For allowing ssh from the cloud to home
+# echo -e "CLOUD_TO_HOME_KEY=\"$CLOUD_TO_HOME_AUTH_KEY\"" >> "$CONF_FILE"
+# echo -e "SSH_PORT=\"$SSH_PORT\"" >>$CONF_FILE
+# echo -e "PUB_IP=\"$PUB_IP\"" >>$CONF_FILE
+
 REQUIRED_VARIABLES=(CLOUDRUNNER_ROOT_PASS HOME_TO_CLOUD_KEY CLOUD_TO_HOME_KEY SSH_PORT PUB_IP CLOUDRUNNER_DEFAULT_IMAGE)
 chmod 600 "$CONF_FILE"
+
 
 # Move the contents of the project to CONF_DIR
 echo -e "\nMoving Scripts to .config"
@@ -195,7 +215,6 @@ NEW_USER="cloud-runner"
 NEW_USER_HOME="/home/$NEW_USER/"
 NEW_USER_SSH_DIR="$NEW_USER_HOME/.ssh"
 SHARED_GROUP="crunner"
-SHARED_DIR="/opt/cloud-runner/"
 
 # Create user and add to group in order to share a folder
 sudo useradd -m "$NEW_USER"
@@ -205,24 +224,31 @@ sudo usermod -aG "$SHARED_GROUP" "$(whoami)"
 
 # Initialize user's .ssh directory
 sudo mkdir -p "$NEW_USER_SSH_DIR"
-cat "$CLOUD_TO_HOME_AUTH_KEY.pub" | sudo tee "$NEW_USER_SSH_DIR/authorized_keys" > /dev/null
+# cat "$CLOUD_TO_HOME_AUTH_KEY.pub" | sudo tee "$NEW_USER_SSH_DIR/authorized_keys" > /dev/null
 sudo chown -R "$NEW_USER":"$NEW_USER" $NEW_USER_HOME
 sudo chmod 700 "$NEW_USER_SSH_DIR"
-sudo chmod 600 "$NEW_USER_SSH_DIR/authorized_keys"
+# sudo chmod 600 "$NEW_USER_SSH_DIR/authorized_keys"
 
-# Initialize shared file for cloud-runner output
-sudo mkdir -p "$SHARED_DIR"
-sudo chown -R :"$SHARED_GROUP" "$SHARED_DIR"
-sudo chmod -R g+rw "$SHARED_DIR"
-sudo chmod g+s "$SHARED_DIR"
-sudo chcon -t ssh_home_t "$SHARED_DIR" &>/dev/null
 
-# Set up SSHFS on shared file
 
 # Link shared folder to home directory
-rm -rf "$HOME/cloud_runner"
-sudo ln -s "$SHARED_DIR" "$HOME/cloud-runner"
+
 #endregion
+
+
+#region Set up Folder Structure:
+
+mkdir -p "$CLOUDRUNNER_DIR" "$OUTPUT_DIR"
+sudo mkdir -p "$CLOUD_SHARE_DIR"
+
+# Make the share shareable
+sudo chown -R :"$SHARED_GROUP" "$CLOUD_SHARE_DIR"
+sudo chmod -R g+rw "$CLOUD_SHARE_DIR"
+sudo chmod g+s "$CLOUD_SHARE_DIR"
+sudo chcon -t ssh_home_t "$CLOUD_SHARE_DIR" &>/dev/null
+
+rm -rf "$CLOUD_SHARE_LINK"
+sudo ln -s "$CLOUD_SHARE_DIR" "$CLOUD_SHARE_LINK"
 
 
 #region Check if install was successfull
@@ -262,23 +288,23 @@ else
 fi
 
 # Check if shared directory exists, belongs to the shared group, and has GID permissions set
-if [[ -d "$SHARED_DIR" && $(stat -c "%G" "$SHARED_DIR") == "$SHARED_GROUP" && $(stat -c "%A" "$SHARED_DIR") == *s* ]]; then
-    checklist+=("Shared directory '$SHARED_DIR' exists, belongs to group '$SHARED_GROUP' and has GID permissions ✔️")
+if [[ -d "$CLOUD_SHARE_DIR" && $(stat -c "%G" "$CLOUD_SHARE_DIR") == "$SHARED_GROUP" && $(stat -c "%A" "$CLOUD_SHARE_DIR") == *s* ]]; then
+    checklist+=("Shared directory '$CLOUD_SHARE_DIR' exists, belongs to group '$SHARED_GROUP' and has GID permissions ✔️")
 else
-    checklist+=("Shared directory '$SHARED_DIR' must belong to $SHARED_GROUP and have GID permissions ❌")
+    checklist+=("Shared directory '$CLOUD_SHARE_DIR' must belong to $SHARED_GROUP and have GID permissions ❌")
 fi
 
 # Check if CONF_FILE is a valid file and required variables are set
-if is_valid_file "$CONF_FILE"; then
-    source "$CONF_FILE"
-    if are_variables_set; then
-        checklist+=("Configuration file '$CONF_FILE' is valid and all required variables are set ✔️")
-    else
-        checklist+=("Configuration file '$CONF_FILE' is missing required variables ❌")
-    fi
-else
-    checklist+=("Configuration file '$CONF_FILE' is not valid ❌")
-fi
+# if is_valid_file "$CONF_FILE"; then
+#     source "$CONF_FILE"
+#     if are_variables_set; then
+#         checklist+=("Configuration file '$CONF_FILE' is valid and all required variables are set ✔️")
+#     else
+#         checklist+=("Configuration file '$CONF_FILE' is missing required variables ❌")
+#     fi
+# else
+#     checklist+=("Configuration file '$CONF_FILE' is not valid ❌")
+# fi
 
 # Check if the libraries folder was copied successfully
 if is_valid_file "$SCRIPT_DIR/libraries/bool.lib"; then
@@ -289,11 +315,11 @@ fi
 
 # Check for successfull inbound SSH connection
 
-if port_is_open "$PUB_IP" "$SSH_PORT"; then
-    checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is open ✔️")
-else
-    checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is not open or reachable ❌")
-fi
+# if port_is_open "$PUB_IP" "$SSH_PORT"; then
+#     checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is open ✔️")
+# else
+#     checklist+=("SSH connection to $PUB_IP over port $SSH_PORT is not open or reachable ❌")
+# fi
 
 # Check if linode-cli command exists
 if command_exists linode-cli; then

@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# <UDF name="PRIV_KEY" label="Private SSH Key" example="Private key for SSH authentication back home" />
-# <UDF name="PUB_KEY" label="Public SSH Key" example="Public key for SSH authentication back home" />
-# <UDF name="SSH_PORT" label="SSH Port" example="Port number for SSH connections back home" />
-# <UDF name="SSH_IP" label="SSH IP Address" example="Public IP address for SSH connections back home" />
-# <UDF name="SSH_USER" label="SSH Username" example="Username for SSH connections back home" />
-
-
 install_apt() {
     local pkg=$1
     echo "Using apt to install $pkg..."
@@ -52,21 +45,22 @@ LOG="/var/log/cloud-runner.log"
 
 # Initialize Cloud-Runner files
 mkdir -p $CLOUDRUNNER_DIR &>>"$LOG"
+mkdir -p
 touch "$LOG" 
 
 
 # Declare Argument Variables
-CLOUD_PRIV_KEY="$PRIV_KEY"
-CLOUD_PUB_KEY="$PUB_KEY"
-HOME_SSH_PORT="$SSH_PORT"
-HOME_SSH_IP="$SSH_IP"
-HOME_SSH_USER="$SSH_USER"
+# CLOUD_PRIV_KEY="$PRIV_KEY"
+# CLOUD_PUB_KEY="$PUB_KEY"
+# HOME_SSH_PORT="$SSH_PORT"
+# HOME_SSH_IP="$SSH_IP"
+# HOME_SSH_USER="$SSH_USER"
 
 
-echo "CLOUD_PUB_KEY: $CLOUD_PUB_KEY" &>>"$LOG"
-echo "HOME_SSH_PORT: $HOME_SSH_PORT" &>>"$LOG"
-echo "HOME_SSH_IP: $HOME_SSH_IP" &>>"$LOG"
-echo "HOME_SSH_USER: $HOME_SSH_USER" &>>"$LOG"
+# echo "CLOUD_PUB_KEY: $CLOUD_PUB_KEY" &>>"$LOG"
+# echo "HOME_SSH_PORT: $HOME_SSH_PORT" &>>"$LOG"
+# echo "HOME_SSH_IP: $HOME_SSH_IP" &>>"$LOG"
+# echo "HOME_SSH_USER: $HOME_SSH_USER" &>>"$LOG"
 
 
 # Install git for starters
@@ -103,6 +97,8 @@ cp "$TMP_DIR"/*.lib "$LIB_SCRIPT_DIR" &>>"$LOG"
 for LIB_FILE in "$LIB_SCRIPT_DIR"/*\.lib; do
     source "$LIB_FILE"
 done
+# echo "scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i $USER_HOME/.ssh/cloud-runner_rsa   $LOG cloud-runner@$HOME_SSH_IP:/opt/cloud-runner/stackscript.log" &>> "$LOG"
+# scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i "$USER_HOME"/.ssh/cloud-runner_rsa "$LOG" cloud-runner@"$HO
 
 # Install Dependencies
 declare -a DEPENDENCIES=(
@@ -120,12 +116,17 @@ install_packages "${DEPENDENCIES[@]}" &>>"$LOG"
 # Create New User
 echo "Creating New User..." &>>"$LOG"
 NEW_USER="cloud-runner"
-USER_HOME="/home/$NEW_USER" 
+USER_HOME="/home/$NEW_USER"
+CLOUDRUNNER_DIR="$USER_HOME/cloud-runner"
+INPUT_DIR="$CLOUDRUNNER_DIR/input"
+OUTPUT_DIR="$CLOUDRUNNER_DIR/output"
+
 useradd -m -U -s /bin/bash "$NEW_USER" &>>"$LOG"
-mkdir -p "$USER_HOME/cloud-runner" &>>"$LOG"
+mkdir -p "$CLOUDRUNNER_DIR" &>>"$LOG"
 mkdir -p "$USER_HOME"/.ssh &>>"$LOG"
-mkdir -p "$USER_HOME/cloud-runner/input"
-mkdir -p "$USER_HOME/cloud-runner/output"
+mkdir -p "$INPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+chmod -R 777 $CLOUDRUNNER_DIR
 
 # Generate a random password for the user
 echo "Generating Random Password..." &>>"$LOG"
@@ -137,24 +138,25 @@ echo "$NEW_USER:$RANDOM_PASS" | chpasswd &>>"$LOG"
 
 
 # Save Homeward bound ssh information to $HOME/cloud-runner
-echo "Copy home variables to user directory" &>>"$LOG"
-echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
-echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
-echo "$HOME_SSH_USER" > $USER_HOME/cloud-runner/home_user
-chown -R $NEW_USER:$NEW_USER "$USER_HOME/cloud-runner" &>>"$LOG"
-chmod 600 "$USER_HOME"/cloud-runner/* &>>"$LOG"
+# echo "Copy home variables to user directory" &>>"$LOG"
+# echo "$HOME_SSH_PORT" > "$USER_HOME/cloud-runner/home_port"
+# echo "$HOME_SSH_IP" > "$USER_HOME/cloud-runner/home_ip"
+# echo "$HOME_SSH_USER" > $USER_HOME/cloud-runner/home_user
+# chown -R $NEW_USER:$NEW_USER "$USER_HOME/cloud-runner" &>>"$LOG"
+# chmod 600 "$USER_HOME"/cloud-runner/* &>>"$LOG"
 
 
 # Copy Root Authorized Keys to the user's directory
 echo "Copying Authorized Keys to New User..." &>>"$LOG"
 cp /root/.ssh/authorized_keys "$USER_HOME"/.ssh/ &>>"$LOG"
-echo "$CLOUD_PUB_KEY" >> "$USER_HOME/.ssh/authorized_keys"
+# echo "$CLOUD_PUB_KEY" >> "$USER_HOME/.ssh/authorized_keys"
+
 
 
 # Copy User Supplied SSH keys to users home directory
-echo "Copying rsa keys to new user..." &>>"$LOG"
-echo "$CLOUD_PRIV_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa 
-echo "$CLOUD_PUB_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa.pub
+# echo "Copying rsa keys to new user..." &>>"$LOG"
+# echo "$CLOUD_PRIV_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa 
+# echo "$CLOUD_PUB_KEY" > "$USER_HOME"/.ssh/cloud-runner_rsa.pub
 chown -R "$NEW_USER":"$NEW_USER" "$USER_HOME"/.ssh &>>"$LOG"
 
 
@@ -162,8 +164,8 @@ chown -R "$NEW_USER":"$NEW_USER" "$USER_HOME"/.ssh &>>"$LOG"
 echo "Updating Permissions for users .ssh directory..." &>>"$LOG"
 chmod 700 "$USER_HOME"/.ssh &>>"$LOG"
 chmod 600 "$USER_HOME"/.ssh/authorized_keys &>>"$LOG"
-chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
-chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
+# chmod 644 "$USER_HOME"/.ssh/cloud-runner_rsa.pub &>>"$LOG"
+# chmod 600 "$USER_HOME"/.ssh/cloud-runner_rsa &>>"$LOG"
 
 
 # Set up SSHFS
@@ -204,6 +206,6 @@ echo "$NEW_USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
 
 
 
-echo "scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i $USER_HOME/.ssh/cloud-runner_rsa   $LOG cloud-runner@$HOME_SSH_IP:/opt/cloud-runner/stackscript.log" &>> "$LOG"
-scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i "$USER_HOME"/.ssh/cloud-runner_rsa "$LOG" cloud-runner@"$HOME_SSH_IP":/opt/cloud-runner/stackscript.log &>> "$LOG"
-
+# echo "scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i $USER_HOME/.ssh/cloud-runner_rsa   $LOG cloud-runner@$HOME_SSH_IP:/opt/cloud-runner/stackscript.log" &>> "$LOG"
+# scp -o StrictHostKeyChecking=no -P $HOME_SSH_PORT -i "$USER_HOME"/.ssh/cloud-runner_rsa "$LOG" cloud-runner@"$HOME_SSH_IP":/opt/cloud-runner/stackscript.log &>> "$LOG"
+cp $LOG
