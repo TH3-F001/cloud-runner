@@ -10,6 +10,7 @@ SSH_USER="cloud-runner"
 LINODE_LABEL="Cloud-Runner"
 FIREWALL_LABEL="Cloud-Runner_Firewall"
 STACKSCRIPT_LABEL="$LINODE_LABEL-Script"
+DEPLOYED_STRING="[ Cloud-Runner Deployment Completed! ]"
 
 # Source Libraries
 source "$LIB_SCRIPT_DIR/cloud-runner.lib"
@@ -22,7 +23,7 @@ LINODE_OUTPUT_DIR="$LINODE_SHARE/output"
 #endregion
 
 
-#region Parse input arguments
+#region Parse input argumentsww
 
 FILE_PATHS=()
 ARGS_STRING="$*"
@@ -102,10 +103,6 @@ LINODE_IP=$(get_linode_ipv4 "$LINODE_LABEL")
 #region Confirm Successfull Deployment
 
 # Wait for Linode's IP to respond
-echo -e "\nWaiting for $LINODE_IP to respond..."
-while ! ping -c 1 -W 1 "$LINODE_IP" &> /dev/null; do
-    sleep 2
-done
 sleep 120
 
 # Attempt to connect via SSH
