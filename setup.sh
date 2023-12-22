@@ -200,10 +200,14 @@ cp "$SCRIPT_DIR"/*.sh "$CONF_DIR/"
 
 # Add user supplied dependencies to existing dependencies in the stack script
 echo -e "\nAdding Dependencies to the Master Stackscript"
-IFS=' ' read -r -a USER_DEPS_ARRAY <<< "$USER_DEPS"
-DEPS_STRING=$(printf " \"%s\"" "${USER_DEPS_ARRAY[@]}")
-DEPS_STRING=${DEPS_STRING:1}
-sed -i "s/# Placeholder for user dependencies/DEPENDENCIES+=($DEPS_STRING)/" "$MASTER_STACKSCRIPT"
+if [ -n "$USER_DEPS" ]; then
+    IFS=' ' read -r -a USER_DEPS_ARRAY <<< "$USER_DEPS"
+    DEPS_STRING=$(printf " \"%s\"" "${USER_DEPS_ARRAY[@]}")
+    DEPS_STRING=${DEPS_STRING:1}
+    sed -i "s/# Placeholder for user dependencies/DEPENDENCIES+=($DEPS_STRING)/" "$MASTER_STACKSCRIPT"
+else
+    echo "No additional dependencies specified by the user."
+fi
 #endregion
 
 

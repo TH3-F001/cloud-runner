@@ -5,8 +5,8 @@ echo -e "=============[ Beginning Cloud-Runner Deployment ]=============" &>>"$L
 
 # Stop ssh service to make prevent premature notification of completion
 # cloud-runner.sh waits until it can make a successfull ssh connection before continuing
-systemctl stop sshd &>>"$LOG"
-systemctl stop ssh &>>"$LOG"
+# systemctl stop sshd &>>"$LOG"
+# systemctl stop ssh &>>"$LOG"
 
 #region Create cloud-runner user
 
@@ -77,10 +77,10 @@ install_and_log() {
 }
 
 install_apt() {
-    apt-get update
-    apt-get upgrade -y
+    apt update
+    DEBIAN_FRONTEND=noninteractive apt upgrade -y -o Dpkg::Options::="--force-confold"
     for pkg in "${DEPENDENCIES[@]}"; do
-        install_and_log "$pkg" "apt-get install -y"
+        install_and_log "$pkg" "apt install -y"
     done
 }
 
@@ -165,11 +165,11 @@ sed -i 's/^PermitRootLogin .*/PermitRootLogin no/' "$SSHD_CONFIG" &>>"$LOG"
 echo "Checking Which SSH Service to Enable." &>>"$LOG"
 if systemctl list-units --type=service | grep -q 'sshd'; then
     echo "Enabling and starting 'sshd' service..." &>>"$LOG"
-    systemctl start sshd &>>"$LOG"
+    systemctl restart sshd &>>"$LOG"
     systemctl enable sshd &>>"$LOG"
 elif systemctl list-units --type=service | grep -q 'ssh'; then
     echo "Enabling and starting 'ssh' service..." &>>"$LOG"
-    systemctl start ssh &>>"$LOG"
+    systemctl restart ssh &>>"$LOG"
     systemctl enable ssh &>>"$LOG"
 else
     echo "SSH service not found." &>>"$LOG"

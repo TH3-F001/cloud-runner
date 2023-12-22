@@ -103,32 +103,37 @@ LINODE_IP=$(get_linode_ipv4 "$LINODE_LABEL")
 #region Confirm Successfull Deployment
 
 # Wait for Linode's IP to respond
+echo -e "\nWaiting for cloud-runner deployment to complete. Go grab a caffinated beverage."
 sleep 120
 
-# Attempt to connect via SSH
-echo -e "\n Attempting to connect to $LINODE_IP via SSH..."
-if ssh -o StrictHostKeyChecking=no -T -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP"  "echo 'SSH connection successful' > /home/$SSH_USER/.ssh-test.txt"; then
-    echo -e "\nSSH Connection Successful!"
-    # ssh -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" 
-else
-    echo -e "\nSSH Connection Failed: Unable to connect or write to the test file."
-    echo "ssh -o StrictHostKeyChecking=no -i $HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP "
-    echo "$(encode_password $CLOUDRUNNER_ROOT_PASS)"
-    exit 1
-fi
+# Loop until SSH connection is successful
+encode_password "$CLOUDRUNNER_ROOT_PASS"
+echo "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i $HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP"
+while true; do
+    if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i "$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP" "echo 'SSH connection successful'" &>/dev/null; then
+        echo "SSH connection to $LINODE_IP established successfully."
+        break
+    else
+        echo "SSH connection to $LINODE_IP failed. Retrying..."
+        sleep 5 
+    fi
+done
 
-    echo "ssh -o StrictHostKeyChecking=no -i $HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP "
-    echo "$(encode_password $CLOUDRUNNER_ROOT_PASS)"
+
+# TODO, Fix cloud directory so we have /opt/cloud-runner/cloud and cloud-runner/results, 
+# sshf mount cloud, move contents to results. (will need to edit setup too)
 
 # Mount LINODE_SHARE to CLOUD_SHARE_DIR and confirm successfull access to linode filesystem
 # ssh $SSH_USER@$LINODE_IP "mkdir -p $LINODE_INPUT_DIR $LINODE_OUTPUT_DIR"
-sshfs -o allow_other,default_permissions -o IdentityFile="$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP:/$LINODE_SHARE" "$CLOUD_SHARE_DIR"
+echo "sshfs -o allow_other,default_permissions -o IdentityFile=$HOME_TO_CLOUD_KEY $SSH_USER@$LINODE_IP:/$LINODE_SHARE $CLOUD_SHARE_DIR" 
+sshfs -o StrictHostKeyChecking=no -o IdentityFile="$HOME_TO_CLOUD_KEY" "$SSH_USER@$LINODE_IP:/$LINODE_SHARE" "$CLOUD_SHARE_DIR"
 
-echo -e "\n$LINODE_IP is now responding to ping. Waiting for linode to complete stackscript..."
+echo -e "\n$LINODE_IP is now responding. Waiting for linode to complete stackscript..."
 while true; do
     STACKSCRIPT_LOG=$(find "$CLOUD_SHARE_DIR" -name '*.log' -print -quit)
     if [ -n "$STACKSCRIPT_LOG" ]; then
         echo "Log file found in $STACKSCRIPT_LOG."
+        cp "$STACKSCRIPT_LOG" "$HOME/Desktop/"
         break
     else
         sleep 2
@@ -157,7 +162,7 @@ echo "Files to transfer:"
 printf '%s\n' "${FILE_PATHS[@]}"
 
 
-# lin linodes delete $(get_linode_id $LINODE_LABEL)
-# lin linodes ls
+lin linodes delete $(get_linode_id $LINODE_LABEL)
+lin linodes ls
 
 
